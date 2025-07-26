@@ -540,6 +540,35 @@
   border: 3px solid #007bff;
 }
 
+.hand-tile.dragging {
+  opacity: 0;
+  transform: rotate(5deg) scale(1.1);
+  z-index: 1000;
+  cursor: grabbing;
+  transition: none;
+}
+
+.hand-tile {
+  cursor: grab;
+  transition: all 0.3s ease;
+}
+
+.hand-tile:active {
+  cursor: grabbing;
+}
+
+/* 정렬 애니메이션을 위한 클래스 */
+.hand-tile.sorting {
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative;
+  z-index: 10;
+  will-change: transform;
+}
+
+.hand-tile.sorting.dragging {
+  transition: none !important;
+}
+
 .hand-tile.gold {
   background: linear-gradient(135deg, #ffd700 0%, #ffb347 100%);
   color: #333;

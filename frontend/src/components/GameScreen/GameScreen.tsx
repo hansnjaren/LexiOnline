@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './GameScreen.css';
 import coinImage from '../../coin.png';
 import cardImage from '../../card.png';
@@ -41,6 +41,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
   const [boardSize, setBoardSize] = useState({ rows: 4, cols: 15 });
   const [showCombinationGuide, setShowCombinationGuide] = useState(false);
   const [showGameGuide, setShowGameGuide] = useState(false);
+  
+  // 드래그 앤 드롭 관련 상태
+  const [draggedCard, setDraggedCard] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isSorting, setIsSorting] = useState(false);
+  const [cardOffsets, setCardOffsets] = useState<{ [key: number]: number }>({});
+  const handRef = useRef<HTMLDivElement>(null);
   
   // 플레이어 정보 (이미지에 맞게 수정)
   const players: Player[] = [
@@ -115,7 +123,82 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
     );
   };
 
-  const handleDrop = () => {
+  // 드래그 시작 핸들러
+  const handleDragStart = (e: React.DragEvent, cardId: number) => {
+    setDraggedCard(cardId);
+    setIsDragging(true);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', cardId.toString());
+    
+    // 드래그 이미지 설정
+    const cardElement = e.currentTarget as HTMLElement;
+    const dragImage = cardElement.cloneNode(true) as HTMLElement;
+    dragImage.style.opacity = '1';
+    dragImage.style.transform = 'rotate(5deg) scale(1.1)';
+    dragImage.style.zIndex = '1000';
+    document.body.appendChild(dragImage);
+    
+    e.dataTransfer.setDragImage(dragImage, 25, 30);
+    
+    // 드래그 이미지 제거
+    setTimeout(() => {
+      document.body.removeChild(dragImage);
+    }, 0);
+  };
+
+  // 드래그 오버 핸들러
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  // 드래그 리브 핸들러
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverIndex(null);
+  };
+
+  // 드롭 핸들러
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (draggedCard === null) return;
+    
+    const draggedIndex = sortedHand.findIndex(card => card.id === draggedCard);
+    if (draggedIndex === -1) return;
+    
+    // 같은 위치에 드롭한 경우 무시
+    if (draggedIndex === dropIndex) {
+      setDraggedCard(null);
+      setDragOverIndex(null);
+      setIsDragging(false);
+      return;
+    }
+    
+    // 카드 순서 변경
+    const newHand = [...sortedHand];
+    const [draggedItem] = newHand.splice(draggedIndex, 1);
+    newHand.splice(dropIndex, 0, draggedItem);
+    
+    setSortedHand(newHand);
+    setDraggedCard(null);
+    setDragOverIndex(null);
+    setIsDragging(false);
+  };
+
+  // 드래그 엔드 핸들러
+  const handleDragEnd = () => {
+    setDraggedCard(null);
+    setDragOverIndex(null);
+    setIsDragging(false);
+  };
+
+  const handlePass = () => {
+    console.log('Pass 액션');
+  };
+
+  const handleSubmitCards = () => {
     if (selectedCards.length === 0) return;
     
     // 기존 카드들의 isNew를 false로 변경
@@ -368,16 +451,35 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
     setSelectedCards([]);
   };
 
-  const handlePass = () => {
-    console.log('Pass 액션');
-  };
-
   const handleSortByNumber = () => {
+    setIsSorting(true);
+    
+    // 정렬된 순서 계산
     const sorted = [...sortedHand].sort((a, b) => a.value - b.value);
-    setSortedHand(sorted);
+    
+    // 각 카드의 이동 거리 계산
+    const offsets: { [key: number]: number } = {};
+    sortedHand.forEach((card, currentIndex) => {
+      const newIndex = sorted.findIndex(c => c.id === card.id);
+      if (newIndex !== currentIndex) {
+        offsets[card.id] = (newIndex - currentIndex) * 48; // 카드 간격
+      }
+    });
+    
+    setCardOffsets(offsets);
+    
+    // 애니메이션 완료 후 배열 업데이트
+    setTimeout(() => {
+      setSortedHand(sorted);
+      setCardOffsets({});
+      setIsSorting(false);
+    }, 500);
   };
 
   const handleSortByColor = () => {
+    setIsSorting(true);
+    
+    // 정렬된 순서 계산
     const colorOrder = gameMode === 'beginner' 
       ? ['gold', 'silver', 'bronze', 'black']
       : ['sun', 'moon', 'star', 'cloud'];
@@ -392,7 +494,24 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
       // 같은 색상 내에서는 숫자 순으로 정렬
       return a.value - b.value;
     });
-    setSortedHand(sorted);
+    
+    // 각 카드의 이동 거리 계산
+    const offsets: { [key: number]: number } = {};
+    sortedHand.forEach((card, currentIndex) => {
+      const newIndex = sorted.findIndex(c => c.id === card.id);
+      if (newIndex !== currentIndex) {
+        offsets[card.id] = (newIndex - currentIndex) * 48; // 카드 간격
+      }
+    });
+    
+    setCardOffsets(offsets);
+    
+    // 애니메이션 완료 후 배열 업데이트
+    setTimeout(() => {
+      setSortedHand(sorted);
+      setCardOffsets({});
+      setIsSorting(false);
+    }, 500);
   };
 
   const handleViewCombinations = () => {
@@ -501,7 +620,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
 
             {/* 우측 - Drop/Pass 버튼 */}
             <div className="action-buttons">
-              <button className="action-btn drop-btn" onClick={handleDrop}>
+              <button className="action-btn drop-btn" onClick={handleSubmitCards}>
                 Submit
               </button>
               <button className="action-btn pass-btn" onClick={handlePass}>
@@ -513,12 +632,21 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
           {/* 하단 하단 - 내 손패 및 정렬 버튼 */}
           <div className="bottom-bottom">
             {/* 내 손패 */}
-            <div className="my-hand">
-              {sortedHand.map((tile) => (
+            <div className="my-hand" ref={handRef}>
+              {sortedHand.map((tile, index) => (
                 <div 
-                  key={tile.id} 
-                  className={`hand-tile ${getDisplayColor(tile.color, gameMode)} ${selectedCards.includes(tile.id) ? 'selected' : ''}`}
+                  key={`card-${tile.id}`} 
+                  className={`hand-tile ${getDisplayColor(tile.color, gameMode)} ${selectedCards.includes(tile.id) ? 'selected' : ''} ${draggedCard === tile.id ? 'dragging' : ''} ${isSorting ? 'sorting' : ''}`}
+                  style={isSorting && cardOffsets[tile.id] !== undefined ? {
+                    transform: `translateX(${cardOffsets[tile.id]}px)`
+                  } : {}}
                   onClick={() => handleCardSelect(tile.id)}
+                  draggable={true}
+                  onDragStart={(e) => handleDragStart(e, tile.id)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, index)}
+                  onDragEnd={handleDragEnd}
                 >
                   {getCardImage(getDisplayColor(tile.color, gameMode)) && (
                     <img 
