@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSpring, animated } from '@react-spring/web';
+import { motion } from 'framer-motion';
 import './GameScreen.css';
 import coinImage from '../../coin.png';
 import cardImage from '../../card.png';
@@ -8,6 +10,7 @@ import starImage from '../../star.png';
 import cloudImage from '../../cloud.png';
 import CombinationGuide from './CombinationGuide';
 import GameGuide from './GameGuide';
+import CardDealAnimation from './CardDealAnimation';
 
 interface GameScreenProps {
   onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result') => void;
@@ -20,6 +23,21 @@ interface Player {
   remainingTiles: number;
   isCurrentPlayer: boolean;
 }
+
+// 애니메이션된 남은 패 개수 컴포넌트
+const AnimatedRemainingTiles: React.FC<{ count: number }> = ({ count }) => {
+  const { number } = useSpring({
+    number: count,
+    from: { number: 0 },
+    config: { tension: 300, friction: 20 }
+  });
+
+  return (
+    <animated.span>
+      {number.to(n => String(Math.round(n)).padStart(2, '0'))}
+    </animated.span>
+  );
+};
 
 const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
   const [currentCombination, setCurrentCombination] = useState<string>('');
@@ -42,6 +60,16 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
   const [showCombinationGuide, setShowCombinationGuide] = useState(false);
   const [showGameGuide, setShowGameGuide] = useState(false);
   
+  // 카드 분배 애니메이션 관련 상태
+  const [showCardDealAnimation, setShowCardDealAnimation] = useState(true);
+  const [isGameStarted, setIsGameStarted] = useState(false);
+  const [dealtCards, setDealtCards] = useState<Set<number>>(new Set());
+  const [visibleHand, setVisibleHand] = useState<Array<{
+    id: number;
+    value: number;
+    color: string;
+  }>>([]);
+  
   // 드래그 앤 드롭 관련 상태
   const [draggedCard, setDraggedCard] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -51,12 +79,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
   const handRef = useRef<HTMLDivElement>(null);
   
   // 플레이어 정보 (이미지에 맞게 수정)
-  const players: Player[] = [
-    { id: '1', nickname: '닉네임', coinCount: 12, remainingTiles: 8, isCurrentPlayer: false },
-    { id: '2', nickname: '닉네임', coinCount: 15, remainingTiles: 12, isCurrentPlayer: false },
-    { id: '3', nickname: '닉네임', coinCount: 8, remainingTiles: 15, isCurrentPlayer: false },
-    { id: '4', nickname: '닉네임', coinCount: 20, remainingTiles: 10, isCurrentPlayer: true },
-  ];
+  const [players, setPlayers] = useState<Player[]>([
+    { id: '1', nickname: '닉네임', coinCount: 12, remainingTiles: 0, isCurrentPlayer: false },
+    { id: '2', nickname: '닉네임', coinCount: 15, remainingTiles: 0, isCurrentPlayer: false },
+    { id: '3', nickname: '닉네임', coinCount: 8, remainingTiles: 0, isCurrentPlayer: false },
+    { id: '4', nickname: '닉네임', coinCount: 20, remainingTiles: 0, isCurrentPlayer: true },
+  ]);
 
   // 카드 색상 매핑 (초보모드 ↔ 일반모드)
   const colorMapping = {
@@ -107,12 +135,82 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
 
   // 정렬된 손패 초기화
   useEffect(() => {
-    setSortedHand([...myHand]);
-  }, [myHand]);
+    if (!showCardDealAnimation) {
+      setSortedHand([...myHand]);
+    }
+  }, [myHand, showCardDealAnimation]);
 
   const handleGameEnd = () => {
     console.log('게임 종료');
     onScreenChange('result');
+  };
+
+  const handleCardDealComplete = () => {
+    setShowCardDealAnimation(false);
+    setIsGameStarted(true);
+    setDealtCards(new Set());
+    setVisibleHand([...myHand]); // 모든 카드를 visibleHand에 설정
+    
+    // 게임 시작 시 플레이어들의 남은 패 개수를 실제 값으로 설정
+    setPlayers([
+      { id: '1', nickname: '닉네임', coinCount: 12, remainingTiles: 8, isCurrentPlayer: false },
+      { id: '2', nickname: '닉네임', coinCount: 15, remainingTiles: 12, isCurrentPlayer: false },
+      { id: '3', nickname: '닉네임', coinCount: 8, remainingTiles: 15, isCurrentPlayer: false },
+      { id: '4', nickname: '닉네임', coinCount: 20, remainingTiles: 10, isCurrentPlayer: true },
+    ]);
+    
+    // 손패를 정렬된 상태로 설정
+    setSortedHand([...myHand]);
+  };
+
+  const handleMyCardDealt = (cardIndex: number) => {
+    setDealtCards(prev => new Set(Array.from(prev).concat([cardIndex])));
+    // 카드가 분배될 때마다 실시간으로 visibleHand에 추가
+    setVisibleHand(prev => {
+      const card = sortedHand[cardIndex];
+      if (card && !prev.find(c => c.id === card.id)) {
+        return [...prev, card];
+      }
+      return prev;
+    });
+  };
+
+  // 카드 분배 애니메이션 완료 후 dealt 상태로 변경
+  useEffect(() => {
+    if (showCardDealAnimation) {
+      const timers: NodeJS.Timeout[] = [];
+      
+      sortedHand.forEach((_, index) => {
+        const timer = setTimeout(() => {
+          handleMyCardDealt(index);
+        }, (index + 1) * 120 + 600); // 애니메이션 delay + duration
+        
+        timers.push(timer);
+      });
+      
+      return () => {
+        timers.forEach(timer => clearTimeout(timer));
+      };
+    }
+  }, [showCardDealAnimation, sortedHand.length]);
+
+  // 모든 카드가 dealt 상태가 되면 애니메이션 완료
+  useEffect(() => {
+    if (showCardDealAnimation && dealtCards.size === sortedHand.length && sortedHand.length > 0) {
+      const timer = setTimeout(() => {
+        handleCardDealComplete();
+      }, 1000); // 마지막 카드 뒤집힌 후 1초 대기
+      
+      return () => clearTimeout(timer);
+    }
+  }, [dealtCards.size, sortedHand.length, showCardDealAnimation]);
+
+  const handlePlayerCardReceived = (playerIndex: number) => {
+    setPlayers(prev => prev.map((player, index) => 
+      index === playerIndex 
+        ? { ...player, remainingTiles: player.remainingTiles + 1 }
+        : player
+    ));
   };
 
   const handleCardSelect = (cardId: number) => {
@@ -526,6 +624,19 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
 
   return (
     <div className="game-screen">
+      {/* 카드 분배 애니메이션 */}
+      <CardDealAnimation
+        isVisible={showCardDealAnimation}
+        onComplete={handleCardDealComplete}
+        playerCount={4}
+        cardsPerPlayer={16}
+        myPlayerIndex={3} // 내 플레이어 인덱스 (0부터 시작)
+        myHand={myHand}
+        onPlayerCardReceived={handlePlayerCardReceived}
+        onMyCardDealt={handleMyCardDealt}
+        gameMode={gameMode}
+      />
+      
       <div className="game-container">
         {/* 상단 좌측 - 다른 플레이어 정보 */}
         <div className="top-left-section">
@@ -543,7 +654,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
                 </div>
                 <div className="remaining-tiles-count">
                   <img src={cardImage} alt="카드" className="card-icon" />
-                  {String(player.remainingTiles).padStart(2, '0')}
+                  <AnimatedRemainingTiles count={player.remainingTiles} />
                 </div>
               </div>
             ))}
@@ -632,30 +743,39 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
           {/* 하단 하단 - 내 손패 및 정렬 버튼 */}
           <div className="bottom-bottom">
             {/* 내 손패 */}
-            <div className="my-hand" ref={handRef}>
-              {sortedHand.map((tile, index) => (
+            <div className={`my-hand ${showCardDealAnimation ? 'dealing' : ''}`} ref={handRef}>
+              {(showCardDealAnimation ? visibleHand : sortedHand).map((tile, index) => (
                 <div 
                   key={tile.id} 
-                  className={`hand-tile ${getDisplayColor(tile.color, gameMode)} ${selectedCards.includes(tile.id) ? 'selected' : ''} ${draggedCard === tile.id ? 'dragging' : ''} ${isSorting ? 'sorting' : ''}`}
+                  className={`hand-tile ${getDisplayColor(tile.color, gameMode)} ${selectedCards.includes(tile.id) ? 'selected' : ''} ${draggedCard === tile.id ? 'dragging' : ''} ${isSorting ? 'sorting' : ''} ${showCardDealAnimation ? 'dealing' : ''} ${dealtCards.has(index) ? 'dealt' : ''}`}
                   style={isSorting && cardOffsets[tile.id] !== undefined ? {
                     transform: `translateX(${cardOffsets[tile.id]}px)`
+                  } : showCardDealAnimation ? {
+                    animationDelay: `${index * 0.12}s`
                   } : {}}
                   onClick={() => handleCardSelect(tile.id)}
-                  draggable={!isSorting}
-                  onDragStart={(e) => handleDragStart(e, tile.id)}
-                  onDragOver={(e) => handleDragOver(e, index)}
+                  draggable={!isSorting && !showCardDealAnimation}
+                  onDragStart={(e: React.DragEvent) => handleDragStart(e, tile.id)}
+                  onDragOver={(e: React.DragEvent) => handleDragOver(e, index)}
                   onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, index)}
+                  onDrop={(e: React.DragEvent) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
                 >
-                  {getCardImage(getDisplayColor(tile.color, gameMode)) && (
-                    <img 
-                      src={getCardImage(getDisplayColor(tile.color, gameMode))!} 
-                      alt={getDisplayColor(tile.color, gameMode)} 
-                      className="card-image"
-                    />
+                  {/* 카드 분배 애니메이션 중에는 뒷면만 표시 */}
+                  {showCardDealAnimation && !dealtCards.has(index) ? (
+                    <div className="card-back-animation" />
+                  ) : (
+                    <>
+                      {getCardImage(getDisplayColor(tile.color, gameMode)) && (
+                        <img 
+                          src={getCardImage(getDisplayColor(tile.color, gameMode))!} 
+                          alt={getDisplayColor(tile.color, gameMode)} 
+                          className="card-image"
+                        />
+                      )}
+                      <span className="tile-value">{tile.value}</span>
+                    </>
                   )}
-                  <span className="tile-value">{tile.value}</span>
                 </div>
               ))}
             </div>
