@@ -1,6 +1,6 @@
 .game-screen {
-  width: 1440px;
-  height: 960px;
+  width: 100vw;
+  height: 100vh;
   background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 25%, #0f0f0f 50%, #1a1a1a 75%, #2a2a2a 100%);
   display: flex;
   justify-content: center;
@@ -79,13 +79,13 @@
 
 .player-nickname {
   font-weight: bold;
-  font-size: 14px;
+  font-size: 0.9vw;
   margin-bottom: 2px;
   color: #495057;
 }
 
 .player-coins {
-  font-size: 12px;
+  font-size: 0.7vw;
   color: #6c757d;
   margin-bottom: 1px;
   display: flex;
@@ -100,7 +100,7 @@
 }
 
 .player-tiles {
-  font-size: 12px;
+  font-size: 0.7vw;
   color: #6c757d;
   display: flex;
   align-items: center;
@@ -123,7 +123,7 @@
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 0.8vw;
   gap: 2px;
   flex-direction: row;
   padding: 4px;
@@ -184,7 +184,7 @@
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 16px;
+  font-size: 1vw;
   color: white;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
   transition: all 0.3s ease;
@@ -262,7 +262,7 @@
 
 .card-value {
   font-weight: bold;
-  font-size: 16px;
+  font-size: 1.5vw;
   position: absolute;
   top: 10%;
   left: 30%;
@@ -289,8 +289,8 @@
   gap: 10px;
   border-radius: 8px;
   padding: 10px;
-  min-height: 200px;
-  max-height: 300px;
+  min-height: 180px;
+  max-height: 280px;
   overflow-y: auto;
 }
 
@@ -300,7 +300,7 @@
   justify-content: space-between;
   align-items:end;
   gap: 20px;
-  height: 50px;
+  height: 60px;
   flex-shrink: 0;
 }
 
@@ -326,7 +326,7 @@
 
 .my-nickname {
   font-weight: bold;
-  font-size: 14px;
+  font-size: 1vw;
   margin-bottom: 4px;
   color: #495057;
 }
@@ -334,7 +334,7 @@
 .my-stats {
   display: flex;
   gap: 10px;
-  font-size: 12px;
+  font-size: 0.7vw;
   color: #6c757d;
 }
 
@@ -370,7 +370,7 @@
 }
 
 .current-combination {
-  font-size: 14px;
+  font-size: 0.8vw;
   font-weight: bold;
   flex: 1;
   text-align: center;
@@ -390,7 +390,7 @@
   border: none;
   border-radius: 4px;
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: 1vw;
   font-weight: bold;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -423,7 +423,7 @@
 .action-btn {
   color: white;
   border: none;
-  font-size: 16px;
+  font-size: 1vw;
   font-weight: bold;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -497,36 +497,41 @@
   border: 2px solid rgba(255, 255, 255, 0.3);
   background: rgba(200, 200, 200, 0.9);
   backdrop-filter: blur(5px);
+  min-height: 100px;
 }
 
 /* 내 손패 */
 .my-hand {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   flex: 1;
-  overflow-x: auto;
-  padding: 8px;
+  overflow: hidden;
+  padding: 4px;
   align-items: center;
   flex-wrap: nowrap;
-  align-content: center;
+  justify-content: flex-start;
+  margin-right: 0vw; /* sort-buttons 공간 확보 */
 }
 
 .hand-tile {
-  width: 42px;
-  height: 60px;
+  flex: 1; /* 각 카드가 동일한 공간을 차지하도록 */
+  max-width: calc((100% - 10vw - 4px * 15) / 16); /* 최대 너비 제한 */
+  aspect-ratio: 42/60; /* 가로세로 비율을 42:60으로 고정 */
   border: 2px solid #ffffff;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 16px;
+  font-size: 1vw;
   color: white;
   cursor: pointer;
   transition: all 0.2s ease;
   flex-shrink: 0;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
   position: relative;
+  min-width: 30px;
+  min-height: 43px;
 }
 
 .hand-tile:hover {
@@ -559,7 +564,7 @@
 
 /* 정렬 애니메이션을 위한 클래스 */
 .hand-tile.sorting {
-  transition: transform 0.4s linear !important;
+  transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
   position: relative;
   z-index: 10;
   will-change: transform;
@@ -634,9 +639,9 @@
 
 .tile-value {
   font-weight: bold;
-  font-size: 16px;
+  font-size: 1.4vw;
   position: absolute;
-  top: 7%;
+  top: 6%;
   left: 34%;
   transform: translateX(-50%);
   z-index: 2;
@@ -647,26 +652,33 @@
 .sort-buttons {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0.5vw;
   flex-shrink: 0;
   margin-right: 0;
   padding-right: 0;
-  padding: 0 8px;
+  padding: 0 0.5vw;
+  width: 10vw; /* 기본 너비 설정 */
 }
 
 .sort-btn {
   background: linear-gradient(135deg, #6c757d 0%, #545b62 100%);
   color: white;
   border: none;
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 14px;
+  border-radius: 0.4vw;
+  padding: 0.5vw 0.8vw;
+  font-size: 1.1vw;
   font-weight: bold;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
-  box-shadow: 0 3px 8px rgba(108, 117, 125, 0.3);
+  box-shadow: 0 0.2vw 0.5vw rgba(108, 117, 125, 0.3);
   margin-right: 0;
+  width: 100%;
+  height: 4.5vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 0.5vh;
 }
 
 .sort-btn:hover {
@@ -686,7 +698,7 @@
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 0.6vw;
   font-weight: bold;
   box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
   transition: all 0.2s ease;
@@ -698,13 +710,8 @@
   box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
 }
 
-/* 반응형 디자인 - 1440x960에 최적화 */
+/* 1440px 미만: 기존 반응형 유지 */
 @media (max-width: 1440px) {
-  .game-screen {
-    width: 100vw;
-    height: 100vh;
-  }
-  
   .game-container {
     width: 95%;
     height: 95%;
@@ -721,37 +728,225 @@
   .center-controls {
     gap: 8px;
   }
-
-}
-
-@media (max-width: 768px) {
-  .game-container {
-    grid-template-areas: 
-      "top-left"
-      "game-board"
-      "bottom";
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr auto;
+  
+  .bottom-section {
+    min-height: 160px;
+    max-height: 260px;
   }
   
-  .game-board {
-    gap: 8px;
-    padding: 8px;
-  }
-  
-  .slot {
-    width: 30px;
-    height: 40px;
+  .bottom-bottom {
+    min-height: 90px;
   }
   
   .hand-tile {
-    width: 35px;
-    height: 50px;
-    font-size: 14px;
+    flex: 1;
+    max-width: calc((100% - 10vw - 4px * 15) / 16);
+    aspect-ratio: 42/60;
+    min-width: 25px;
+    min-height: 36px;
   }
   
-  .other-players {
-    flex-direction: row;
-    overflow-x: auto;
+  .tile-value {
+    top: 6%;
+    left: 33%;
+  }
+  
+  .card-value {
+    top: 10%;
+    left: 30%;
+  }
+  
+  .sort-buttons {
+
+    gap: 0.4vw;
+    padding: 0 0.4vw;
+  }
+  
+  .sort-btn {
+    padding: 0.4vw 0.6vw;
+   
+    border-radius: 0.3vw;
   }
 } 
+
+/* 1440px 이상 */
+@media (min-width: 1440px) {
+  .game-screen {
+    width: 100vw;
+    height: 100vh;
+  }
+  .game-container {
+    width: 95vw;
+    height: 95vh;
+    grid-template-columns: 150px 1fr;
+    grid-template-rows: 1fr 180px;
+    gap: 10px;
+    border-radius: 15px;
+    padding: 2vh 3vw;
+    margin: 0 4vw;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    font-size: 1rem;
+  }
+  .game-board-section {
+    padding: 15px;
+  }
+  .game-board {
+    height: 70%;
+    padding: 10px 0 10px 0;
+  }
+  .bottom-section {
+    min-height: 200px;
+    max-height: 320px;
+  }
+  .bottom-top {
+    height: 70px;
+  }
+  .bottom-bottom {
+    min-height: 120px;
+  }
+  
+  .hand-tile {
+    flex: 1;
+    max-width: calc((100% - 10vw - 4px * 15) / 16);
+    aspect-ratio: 42/60;
+    min-width: 35px;
+    min-height: 50px;
+  }
+  .tile-value {
+    top: 8%;
+    left: 35%;
+  }
+  .card-value {
+    top: 12%;
+    left: 32%;
+  }
+  .sort-buttons {
+
+    gap: 0.6vw;
+    padding: 0 0.6vw;
+  }
+  .sort-btn {
+    padding: 0.6vw 0.9vw;
+   
+    border-radius: 0.5vw;
+  }
+}
+
+/* 1920px 이상 */
+@media (min-width: 1920px) {
+  .game-container {
+    width: 90vw;
+    height: 90vh;
+    grid-template-columns: 200px 1fr;
+    grid-template-rows: 1fr 220px;
+    gap: 16px;
+    border-radius: 20px;
+    padding: 3vh 5vw;
+    margin: 0 6vw;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    font-size: 1.15rem;
+  }
+  .game-board-section {
+    padding: 24px;
+  }
+  .game-board {
+    height: 75%;
+    padding: 16px 0 16px 0;
+  }
+  .bottom-section {
+    min-height: 240px;
+    max-height: 380px;
+  }
+  .bottom-top {
+    height: 80px;
+  }
+  .bottom-bottom {
+    min-height: 140px;
+  }
+  
+  .hand-tile {
+    flex: 1;
+    max-width: calc((100% - 10vw - 4px * 15) / 16);
+    aspect-ratio: 42/60;
+    min-width: 40px;
+    min-height: 57px;
+  }
+  .tile-value {
+    top: 9%;
+    left: 36%;
+  }
+  .card-value {
+    top: 13%;
+    left: 33%;
+  }
+  .sort-buttons {
+
+    gap: 0.7vw;
+    padding: 0 0.7vw;
+  }
+  .sort-btn {
+    padding: 0.7vw 1vw;
+
+    border-radius: 0.6vw;
+  }
+}
+
+/* 2560px 이상 */
+@media (min-width: 2560px) {
+  .game-container {
+    width: 80vw;
+    height: 85vh;
+    grid-template-columns: 300px 1fr;
+    grid-template-rows: 1fr 300px;
+    gap: 24px;
+    border-radius: 28px;
+    padding: 4vh 8vw;
+    margin: 0 10vw;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+    font-size: 1.3rem;
+  }
+  .game-board-section {
+    padding: 36px;
+  }
+  .game-board {
+    height: 80%;
+    padding: 24px 0 24px 0;
+  }
+  .bottom-section {
+    min-height: 280px;
+    max-height: 420px;
+  }
+  .bottom-top {
+    height: 90px;
+  }
+  .bottom-bottom {
+    min-height: 160px;
+  }
+  
+  .hand-tile {
+    flex: 1;
+    max-width: calc((100% - 10vw - 4px * 15) / 16);
+    aspect-ratio: 42/60;
+    min-width: 45px;
+    min-height: 64px;
+  }
+  .tile-value {
+    top: 10%;
+    left: 37%;
+  }
+  .card-value {
+    top: 14%;
+    left: 34%;
+  }
+  .sort-buttons {
+
+    gap: 0.8vw;
+    padding: 0 0.8vw;
+    max-width: 200px;
+  }
+  .sort-btn {
+    padding: 0.8vw 1.1vw;
+
+    border-radius: 0.7vw;
+  }
+}

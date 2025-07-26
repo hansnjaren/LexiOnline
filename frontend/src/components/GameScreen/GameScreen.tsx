@@ -462,7 +462,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
     sortedHand.forEach((card, currentIndex) => {
       const newIndex = sorted.findIndex(c => c.id === card.id);
       if (newIndex !== currentIndex) {
-        offsets[card.id] = (newIndex - currentIndex) * 48; // 카드 간격
+        // 카드 간격을 동적으로 계산 (카드 너비 + gap)
+        const cardWidth = handRef.current ? handRef.current.children[0]?.clientWidth || 0 : 0;
+        const gap = 6; // CSS에서 설정된 gap
+        const cardSpacing = cardWidth + gap;
+        offsets[card.id] = (newIndex - currentIndex) * cardSpacing + 6;
       }
     });
     
@@ -473,7 +477,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
       setSortedHand(sorted);
       setCardOffsets({});
       setIsSorting(false);
-    }, 450);
+    }, 800); // CSS 애니메이션 시간과 맞춤
   };
 
   const handleSortByColor = () => {
@@ -500,7 +504,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
     sortedHand.forEach((card, currentIndex) => {
       const newIndex = sorted.findIndex(c => c.id === card.id);
       if (newIndex !== currentIndex) {
-        offsets[card.id] = (newIndex - currentIndex) * 48; // 카드 간격
+        // 카드 간격을 동적으로 계산 (카드 너비 + gap)
+        const cardWidth = handRef.current ? handRef.current.children[0]?.clientWidth || 0 : 0;
+        const gap = 6; // CSS에서 설정된 gap
+        const cardSpacing = cardWidth + gap;
+        offsets[card.id] = (newIndex - currentIndex) * cardSpacing;
       }
     });
     
@@ -511,7 +519,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
       setSortedHand(sorted);
       setCardOffsets({});
       setIsSorting(false);
-    }, 450);
+    }, 800); // CSS 애니메이션 시간과 맞춤
   };
 
   const handleViewCombinations = () => {
