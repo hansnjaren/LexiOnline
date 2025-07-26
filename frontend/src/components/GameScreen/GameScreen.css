@@ -559,14 +559,24 @@
 
 /* 정렬 애니메이션을 위한 클래스 */
 .hand-tile.sorting {
-  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: transform 0.4s linear !important;
   position: relative;
   z-index: 10;
   will-change: transform;
 }
 
+/* 정렬 중이 아닐 때는 transition 없음 */
+.hand-tile:not(.sorting) {
+  transition: none !important;
+}
+
 .hand-tile.sorting.dragging {
   transition: none !important;
+}
+
+/* 배열 업데이트 후 부드러운 전환 */
+.hand-tile {
+  transition: none;
 }
 
 .hand-tile.gold {

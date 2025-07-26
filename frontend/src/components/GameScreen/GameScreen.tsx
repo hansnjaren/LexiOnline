@@ -473,7 +473,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
       setSortedHand(sorted);
       setCardOffsets({});
       setIsSorting(false);
-    }, 500);
+    }, 450);
   };
 
   const handleSortByColor = () => {
@@ -511,7 +511,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
       setSortedHand(sorted);
       setCardOffsets({});
       setIsSorting(false);
-    }, 500);
+    }, 450);
   };
 
   const handleViewCombinations = () => {
@@ -635,13 +635,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
             <div className="my-hand" ref={handRef}>
               {sortedHand.map((tile, index) => (
                 <div 
-                  key={`card-${tile.id}`} 
+                  key={tile.id} 
                   className={`hand-tile ${getDisplayColor(tile.color, gameMode)} ${selectedCards.includes(tile.id) ? 'selected' : ''} ${draggedCard === tile.id ? 'dragging' : ''} ${isSorting ? 'sorting' : ''}`}
                   style={isSorting && cardOffsets[tile.id] !== undefined ? {
                     transform: `translateX(${cardOffsets[tile.id]}px)`
                   } : {}}
                   onClick={() => handleCardSelect(tile.id)}
-                  draggable={true}
+                  draggable={!isSorting}
                   onDragStart={(e) => handleDragStart(e, tile.id)}
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDragLeave={handleDragLeave}
