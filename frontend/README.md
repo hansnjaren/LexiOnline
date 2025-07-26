@@ -1,46 +1,98 @@
-# Getting Started with Create React App
+# 렉시오 온라인 - 프론트엔드
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+React와 TypeScript를 사용하여 구현된 렉시오 보드게임의 온라인 멀티플레이어 버전입니다.
 
-## Available Scripts
+## 프로젝트 구조
 
-In the project directory, you can run:
+```
+src/
+├── components/
+│   └── GameScreen/          # 게임 화면 컴포넌트
+│       ├── GameScreen.tsx   # 메인 게임 화면
+│       ├── GameScreen.css
+│       ├── PlayerInfo.tsx   # 플레이어 정보 표시
+│       ├── PlayerInfo.css
+│       ├── GameBoard.tsx    # 게임 보드
+│       ├── GameBoard.css
+│       ├── PlayerHand.tsx   # 플레이어 손패
+│       ├── PlayerHand.css
+│       ├── GameControls.tsx # 게임 컨트롤
+│       └── GameControls.css
+├── screens/
+│   ├── LobbyScreen/         # 로비 화면
+│   ├── WaitingScreen/       # 대기실 화면
+│   └── ResultScreen/        # 결과 화면
+└── App.tsx                  # 메인 앱 컴포넌트
+```
 
-### `npm start`
+## 화면 구성
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### 1. 로비 화면 (LobbyScreen)
+- 닉네임 입력
+- 방 생성/참가 기능
+- 방 코드 입력
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+### 2. 대기실 화면 (WaitingScreen)
+- 플레이어 목록 표시
+- 준비 상태 확인
+- 방 코드 공유
+- 카운트다운 타이머
 
-### `npm test`
+### 3. 게임 화면 (GameScreen)
+- 게임 보드 (카드 슬롯 배치)
+- 플레이어 정보 표시
+- 손패 관리
+- 게임 컨트롤 (족보보기, 현재모드, Drop/Pass)
+- 정렬 기능 (숫자정렬, 모양정렬)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### 4. 결과 화면 (ResultScreen)
+- 게임 결과 표시
+- 플레이어 순위
+- 게임 통계
+- 다시하기/로비로 돌아가기
 
-### `npm run build`
+## 주요 기능
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- **반응형 디자인**: 다양한 화면 크기에 대응
+- **화면 전환**: 로비 → 대기실 → 게임 → 결과 화면 간 전환
+- **게임 보드**: 루미큐브 스타일의 카드 배치 시스템
+- **플레이어 관리**: 다중 플레이어 지원
+- **실시간 업데이트**: 준비 상태, 카운트다운 등
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## 기술 스택
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- **React 18**: UI 라이브러리
+- **TypeScript**: 타입 안전성
+- **CSS3**: 스타일링
+- **Colyseus**: 실시간 멀티플레이어 서버 (백엔드 연동 예정)
 
-### `npm run eject`
+## 설치 및 실행
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+```bash
+# 의존성 설치
+npm install
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+# 개발 서버 실행
+npm start
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+# 빌드
+npm run build
+```
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+## 게임 규칙
 
-## Learn More
+렉시오는 루미큐브와 유사한 카드 게임으로, 숫자와 모양을 조합하여 조합을 만드는 게임입니다.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+- 각 플레이어는 14장의 카드를 받습니다
+- 숫자나 모양이 같은 카드들을 조합하여 배치합니다
+- 최소 3장 이상의 카드로 조합을 만들어야 합니다
+- 모든 카드를 먼저 배치한 플레이어가 승리합니다
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## 향후 개발 계획
+
+- [ ] Colyseus 서버와의 실시간 연동
+- [ ] 카드 드래그 앤 드롭 기능
+- [ ] 애니메이션 효과 추가
+- [ ] 사운드 효과
+- [ ] 채팅 기능
+- [ ] 게임 히스토리 저장

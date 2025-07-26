@@ -1,0 +1,174 @@
+.waiting-screen {
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #0f1419 0%, #1e2a3a 25%, #2d3a4a 50%, #1e2a3a 75%, #0f1419 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Arial', sans-serif;
+}
+
+.waiting-container {
+  background: rgba(26, 26, 26, 0.95);
+  padding: 40px;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  min-width: 500px;
+  max-width: 600px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.header h1 {
+  color: #ffffff;
+  margin-bottom: 15px;
+}
+
+.room-info {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  color: #cccccc;
+}
+
+.copy-btn {
+  padding: 5px 10px;
+  background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
+  color: #000000;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  box-shadow: 0 2px 6px rgba(255, 255, 255, 0.2);
+}
+
+.players-section {
+  margin-bottom: 30px;
+}
+
+.players-section h2 {
+  color: #ffffff;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.players-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.player-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.nickname {
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.status.ready {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status.waiting {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.game-settings {
+  text-align: center;
+  margin-top: 15px;
+  margin-bottom: 15px;
+  padding: 20px;
+  padding-bottom: 50px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.game-settings h2 {
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.rounds-setting {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+}
+
+.rounds-setting label {
+  font-weight: bold;
+  color: #333;
+  font-size: 16px;
+}
+
+.rounds-setting select {
+  padding: 8px 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 16px;
+  background-color: white;
+  cursor: pointer;
+}
+
+.rounds-setting select:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-ready {
+  background-color: #28a745;
+  color: white;
+}
+
+.btn-ready:hover {
+  background-color: #218838;
+}
+
+.btn-start {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-start:hover {
+  background-color: #c82333;
+} 
