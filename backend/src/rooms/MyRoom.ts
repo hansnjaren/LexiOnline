@@ -53,6 +53,12 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
         return;
       }
 
+      for(const [sessionId, player] of this.state.players){
+        if(!player.ready){
+          client.send("startRejected", { reason: "There exists some players who are not ready. " });
+        }
+      }
+
       this.startGame();
       this.startRound();
       this.broadcast("gameStarted", { totalRounds: this.state.totalRounds, easyMode: this.state.easyMode });
