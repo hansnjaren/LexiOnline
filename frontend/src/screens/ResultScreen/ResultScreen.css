@@ -327,6 +327,7 @@
   gap: 8px;
 }
 
+/*
 .sort-btn {
   border: 2px solid #333;
   background-color: #f0f0f0;
@@ -355,7 +356,9 @@
   flex-direction: row;
   gap: 8px;
 }
+*/
 
+/*
 .control-btn {
   border: 2px solid #333;
   background-color: #f0f0f0;
@@ -385,6 +388,7 @@
 .action-btn:hover {
   background-color: #45a049;
 }
+*/
 
 .current-player-info {
   display: flex;
