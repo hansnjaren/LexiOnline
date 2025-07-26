@@ -53,6 +53,12 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
         return;
       }
 
+      for(const [sessionId, player] of this.state.players){
+        if(!player.ready){
+          client.send("startRejected", { reason: "There exists some players who are not ready. " });
+        }
+      }
+
       this.startGame();
       this.startRound();
       this.broadcast("gameStarted", { totalRounds: this.state.totalRounds, easyMode: this.state.easyMode });
@@ -167,6 +173,7 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       this.state.lastMadeType = MADE_NONE;
       this.state.lastHighestValue = 0;
       this.state.lastCards = new ArraySchema<number>();
+      this.broadcast("cycleEnded", {});
     }
     // 턴 변경 시 추가 액션 처리 가능
   }
