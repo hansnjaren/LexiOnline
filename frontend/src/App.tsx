@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import './App.css';
 import LobbyScreen from './screens/LobbyScreen/LobbyScreen';
 import WaitingScreen from './screens/WaitingScreen/WaitingScreen';
 import GameScreen from './components/GameScreen/GameScreen';
 import ResultScreen from './screens/ResultScreen/ResultScreen';
+import GoogleOAuthCallback from './auth/google/callback';
 
 type ScreenType = 'lobby' | 'waiting' | 'game' | 'result';
 
@@ -30,9 +32,14 @@ function App() {
   };
 
   return (
-    <div className="App">
-      {renderScreen()}
-    </div>
+    <Router>
+      <div className="App">
+        <Routes>
+          <Route path="/auth/google/callback" element={<GoogleOAuthCallback />} />
+          <Route path="*" element={renderScreen()} />
+        </Routes>
+      </div>
+    </Router>
   );
 }
 
