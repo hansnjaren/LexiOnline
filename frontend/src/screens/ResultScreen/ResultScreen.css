@@ -254,7 +254,7 @@
 }
 
 .tile-count {
-  width: 4vw;
+  width: 3vw;
   height: 2.8vh;
   border: 0.3vh solid;
   border-radius: 50%;
@@ -491,7 +491,7 @@
   font-weight: bold;
   font-size: 1.8vh;
   color: #333;
-  width: 60vw;
+  width: auto;
   height: 4vh;
   margin: 0 auto;
   margin-bottom: 3vh;
@@ -502,6 +502,14 @@
     0 0.6vh 2vh rgba(0, 0, 0, 0.1),
     0 0 0 0.1vh rgba(255, 255, 255, 0.2) inset;
   backdrop-filter: blur(0.5vh);
+  transition: width 0.3s ease;
+}
+
+/* 결과 집계 완료 메시지일 때만 너비 조정 */
+.transfer-info.complete-message {
+  width: auto;
+  min-width: 20vw;
+  padding: 0.8vh 2vw;
 }
 
 .transfer-info span {

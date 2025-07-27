@@ -45,6 +45,7 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
   const [cards, setCards] = useState<Card[]>([]);
   const [dealtCount, setDealtCount] = useState(0);
   const [isDealing, setIsDealing] = useState(false);
+  const [showCenterDeck, setShowCenterDeck] = useState(true);
 
   // 카드 색상 매핑 (초보모드 ↔ 일반모드)
   const colorMapping = {
@@ -98,6 +99,7 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
       setCards(initialCards);
       setDealtCount(0);
       setIsDealing(false);
+      setShowCenterDeck(true);
     }
   }, [isVisible, playerCount, cardsPerPlayer]);
 
@@ -123,6 +125,11 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
       }
       
       const card = cards[currentIndex];
+      
+      // 마지막 카드가 출발하는 즉시 중앙 카드더미 숨기기
+      if (currentIndex === total - 1) {
+        setShowCenterDeck(false);
+      }
       
       // 카드 분배 시작
       setCards(prev => prev.map((c, idx) =>
@@ -268,7 +275,7 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
                 y: card.isDealt ? targetPosition.y : centerPosition.y,
                 rotateY: isMyCard ? (card.isFlipped ? 0 : 180) : 180,
                 scale: 1,
-                opacity: card.isDealt ? (isMyCard ? 1 : (card.isArrived ? 0 : 1)) : 1
+                opacity: card.isDealt ? (isMyCard ? 1 : (card.isArrived ? 0 : 1)) : (showCenterDeck ? 1 : 0)
               }}
               transition={{
                 duration: 0.4,

@@ -255,7 +255,7 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
 
         {/* 하단 정보 바 */}
         {!showButtons && (
-          <div className="transfer-info">
+          <div className={`transfer-info ${transferMessage === '결과 집계 완료!' ? 'complete-message' : ''}`}>
             <span dangerouslySetInnerHTML={{ __html: transferMessage }}></span>
           </div>
         )}
