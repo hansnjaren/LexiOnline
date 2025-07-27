@@ -95,30 +95,22 @@
 }
 
 /* 3명 배치 */
-.circular-layout.players-3 .player-box:nth-child(1) { transform: rotate(0deg) translateY(-150px) rotate(0deg); }
-.circular-layout.players-3 .player-box:nth-child(2) { transform: rotate(120deg) translateY(-150px) rotate(-120deg); }
-.circular-layout.players-3 .player-box:nth-child(3) { transform: rotate(240deg) translateY(-150px) rotate(-240deg); }
+.circular-layout.players-3 .player-box:nth-child(1) { transform: rotate(0deg) translateY(-30vh) rotate(0deg); }
+.circular-layout.players-3 .player-box:nth-child(2) { transform: rotate(120deg) translateY(-45vh) rotate(-120deg); }
+.circular-layout.players-3 .player-box:nth-child(3) { transform: rotate(240deg) translateY(-45vh) rotate(-240deg); }
 
 /* 4명 배치 */
-.circular-layout.players-4 .player-box:nth-child(1) { transform: rotate(0deg) translateY(-210px) rotate(0deg); }
-.circular-layout.players-4 .player-box:nth-child(2) { transform: rotate(90deg) translateY(-340px) rotate(-90deg); }
-.circular-layout.players-4 .player-box:nth-child(3) { transform: rotate(180deg) translateY(-210px) rotate(-180deg); }
-.circular-layout.players-4 .player-box:nth-child(4) { transform: rotate(270deg) translateY(-340px) rotate(-270deg); }
+.circular-layout.players-4 .player-box:nth-child(1) { transform: rotate(0deg) translateY(-30vh) rotate(0deg); }
+.circular-layout.players-4 .player-box:nth-child(2) { transform: rotate(90deg) translateY(-40vh) rotate(-90deg); }
+.circular-layout.players-4 .player-box:nth-child(3) { transform: rotate(180deg) translateY(-30vh) rotate(-180deg); }
+.circular-layout.players-4 .player-box:nth-child(4) { transform: rotate(270deg) translateY(-40vh) rotate(-270deg); }
 
 /* 5명 배치 */
-.circular-layout.players-5 .player-box:nth-child(1) { transform: rotate(0deg) translateY(-150px) rotate(0deg); }
-.circular-layout.players-5 .player-box:nth-child(2) { transform: rotate(72deg) translateY(-150px) rotate(-72deg); }
-.circular-layout.players-5 .player-box:nth-child(3) { transform: rotate(144deg) translateY(-150px) rotate(-144deg); }
-.circular-layout.players-5 .player-box:nth-child(4) { transform: rotate(216deg) translateY(-150px) rotate(-216deg); }
-.circular-layout.players-5 .player-box:nth-child(5) { transform: rotate(288deg) translateY(-150px) rotate(-288deg); }
-
-/* 6명 배치 */
-.circular-layout.players-6 .player-box:nth-child(1) { transform: rotate(0deg) translateY(-150px) rotate(0deg); }
-.circular-layout.players-6 .player-box:nth-child(2) { transform: rotate(60deg) translateY(-150px) rotate(-60deg); }
-.circular-layout.players-6 .player-box:nth-child(3) { transform: rotate(120deg) translateY(-150px) rotate(-120deg); }
-.circular-layout.players-6 .player-box:nth-child(4) { transform: rotate(180deg) translateY(-150px) rotate(-180deg); }
-.circular-layout.players-6 .player-box:nth-child(5) { transform: rotate(240deg) translateY(-150px) rotate(-240deg); }
-.circular-layout.players-6 .player-box:nth-child(6) { transform: rotate(300deg) translateY(-150px) rotate(-300deg); }
+.circular-layout.players-5 .player-box:nth-child(1) { transform: rotate(0deg) translateY(-30vh) rotate(0deg); }
+.circular-layout.players-5 .player-box:nth-child(2) { transform: translateX(5vw) rotate(72deg) translateY(-30vh) rotate(-72deg); }
+.circular-layout.players-5 .player-box:nth-child(3) { transform: rotate(144deg) translateY(-34vh) rotate(-144deg); }
+.circular-layout.players-5 .player-box:nth-child(4) { transform: rotate(216deg) translateY(-34vh) rotate(-216deg); }
+.circular-layout.players-5 .player-box:nth-child(5) { transform: translateX(-5vw) rotate(288deg) translateY(-30vh) rotate(-288deg); }
 
 /* 유저 정보 스타일 */
 .player-placeholder {
@@ -142,6 +134,15 @@
   position: absolute;
 }
 
+.tiles-info .remaining-count {
+  position: absolute;
+  white-space: nowrap;
+}
+
+.tiles-info .tile-count {
+  position: absolute;
+}
+
 .tiles-info span {
   background: rgba(255, 255, 255, 0.1);
   padding: 4px 12px;
@@ -153,28 +154,103 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.tiles-info-top {
-  top: -90px;
-  left: 50%;
-  transform: translateX(-50%);
+/* 3명 플레이어용 - 각 플레이어별 정확한 위치 지정 */
+.circular-layout.players-3 .player-box:nth-child(1) .tiles-info .remaining-count {
+  transform: rotate(0deg) translateY(6vh) rotate(0deg);
 }
 
-.tiles-info-right {
-  right: -80px;
-  top: 50%;
-  transform: translateY(-50%);
+.circular-layout.players-3 .player-box:nth-child(1) .tiles-info .tile-count {
+  transform: rotate(0deg) translateY(12vh) rotate(0deg);
 }
 
-.tiles-info-bottom {
-  bottom: -90px;
-  left: 50%;
-  transform: translateX(-50%);
+.circular-layout.players-3 .player-box:nth-child(2) .tiles-info .remaining-count {
+  transform: rotate(120deg) translateY(16vh) rotate(-120deg);
 }
 
-.tiles-info-left {
-  left: -80px;
-  top: 50%;
-  transform: translateY(-50%);
+.circular-layout.players-3 .player-box:nth-child(2) .tiles-info .tile-count {
+  transform: rotate(120deg) translateY(23.5vh) rotate(-120deg);
+}
+
+.circular-layout.players-3 .player-box:nth-child(3) .tiles-info .remaining-count {
+  transform: rotate(240deg) translateY(16vh) rotate(-240deg);
+}
+
+.circular-layout.players-3 .player-box:nth-child(3) .tiles-info .tile-count {
+  transform: rotate(240deg) translateY(23.5vh) rotate(-240deg);
+}
+
+/* 4명 플레이어용 - 각 플레이어별 정확한 위치 지정 */
+.circular-layout.players-4 .player-box:nth-child(1) .tiles-info .remaining-count {
+  transform: rotate(0deg) translateY(6vh) rotate(0deg);
+}
+
+.circular-layout.players-4 .player-box:nth-child(1) .tiles-info .tile-count {
+  transform: rotate(0deg) translateY(12vh) rotate(0deg);
+}
+
+.circular-layout.players-4 .player-box:nth-child(2) .tiles-info .remaining-count {
+  transform: rotate(90deg) translateY(14vh) rotate(-90deg) translateY(-2vh);
+}
+
+.circular-layout.players-4 .player-box:nth-child(2) .tiles-info .tile-count {
+  transform: rotate(90deg) translateY(22vh) rotate(-90deg) translateY(-2vh);
+}
+
+.circular-layout.players-4 .player-box:nth-child(3) .tiles-info .remaining-count {
+  transform: rotate(180deg) translateY(10.5vh) rotate(-180deg);
+}
+
+.circular-layout.players-4 .player-box:nth-child(3) .tiles-info .tile-count {
+  transform: rotate(180deg) translateY(16vh) rotate(-180deg);
+}
+
+.circular-layout.players-4 .player-box:nth-child(4) .tiles-info .remaining-count {
+  transform: rotate(270deg) translateY(14vh) rotate(-270deg) translateY(-2vh);
+}
+
+.circular-layout.players-4 .player-box:nth-child(4) .tiles-info .tile-count {
+  transform: rotate(270deg) translateY(22vh) rotate(-270deg) translateY(-2vh);
+}
+
+/* 5명 플레이어용 - 각 플레이어별 정확한 위치 지정 */
+.circular-layout.players-5 .player-box:nth-child(1) .tiles-info .remaining-count {
+  transform: rotate(0deg) translateY(6vh) rotate(0deg);
+}
+
+.circular-layout.players-5 .player-box:nth-child(1) .tiles-info .tile-count {
+  transform: rotate(0deg) translateY(12vh) rotate(0deg);
+}
+
+.circular-layout.players-5 .player-box:nth-child(2) .tiles-info .remaining-count {
+  transform: rotate(72deg) translateY(13vh) rotate(-72deg);
+}
+
+.circular-layout.players-5 .player-box:nth-child(2) .tiles-info .tile-count {
+  transform: rotate(72deg) translateY(20vh) rotate(-72deg);
+}
+
+.circular-layout.players-5 .player-box:nth-child(3) .tiles-info .remaining-count {
+  transform: rotate(144deg) translateY(13vh) rotate(-144deg);
+}
+
+.circular-layout.players-5 .player-box:nth-child(3) .tiles-info .tile-count {
+  transform: rotate(144deg) translateY(19vh) rotate(-144deg);
+}
+
+.circular-layout.players-5 .player-box:nth-child(4) .tiles-info .remaining-count {
+  transform: rotate(216deg) translateY(13vh) rotate(-216deg);
+}
+
+.circular-layout.players-5 .player-box:nth-child(4) .tiles-info .tile-count {
+  transform: rotate(216deg) translateY(19vh) rotate(-216deg);
+}
+
+.circular-layout.players-5 .player-box:nth-child(5) .tiles-info .remaining-count {
+  transform: rotate(288deg) translateY(13vh) rotate(-288deg);
+}
+
+.circular-layout.players-5 .player-box:nth-child(5) .tiles-info .tile-count {
+  transform: rotate(288deg) translateY(20vh) rotate(-288deg);
 }
 
 .tile-count {
@@ -207,6 +283,12 @@
 .tile-count.black {
   border-color: #333;
   background-color: #333;
+  color: white;
+}
+
+.tile-count.gray {
+  border-color: #666;
+  background-color: #999;
   color: white;
 }
 
@@ -420,6 +502,25 @@
     0 6px 20px rgba(0, 0, 0, 0.1),
     0 0 0 1px rgba(255, 255, 255, 0.2) inset;
   backdrop-filter: blur(5px);
+}
+
+.transfer-info span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.guide-tag {
+  background: linear-gradient(145deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  margin-right: 8px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 /* 컨트롤 버튼들 */

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './ResultScreen.css';
 
 
@@ -92,48 +92,64 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
   const [showArrow, setShowArrow] = useState(false);
   const [showButtons, setShowButtons] = useState(true);
 
-  // 각 타일카운트 원의 ref
-  const tileRefs = {
-    top: useRef<HTMLDivElement>(null),
-    right: useRef<HTMLDivElement>(null),
-    bottom: useRef<HTMLDivElement>(null),
-    left: useRef<HTMLDivElement>(null),
+  // 각 타일카운트 원의 ref를 개별적으로 생성
+  const player0Ref = useRef<HTMLDivElement>(null);
+  const player1Ref = useRef<HTMLDivElement>(null);
+  const player2Ref = useRef<HTMLDivElement>(null);
+  const player3Ref = useRef<HTMLDivElement>(null);
+  const player4Ref = useRef<HTMLDivElement>(null);
+  
+  const tileRefs: { [key: string]: React.RefObject<HTMLDivElement | null> } = {
+    player0: player0Ref,
+    player1: player1Ref,
+    player2: player2Ref,
+    player3: player3Ref,
+    player4: player4Ref,
   };
+  
   const layoutRef = useRef<HTMLDivElement>(null);
-  const [centers, setCenters] = useState<{ [key: string]: { x: number; y: number } | null }>({
-    top: null, right: null, bottom: null, left: null,
-  });
+  const [centers, setCenters] = useState<{ [key: string]: { x: number; y: number } | null }>({});
 
   // 위치 계산
   useEffect(() => {
-    const calc = (key: keyof typeof tileRefs) => {
-      const tile = tileRefs[key].current;
+    const newCenters: { [key: string]: { x: number; y: number } | null } = {};
+    
+    for (let i = 0; i < playerCount; i++) {
+      const key = `player${i}`;
+      const tile = tileRefs[key]?.current;
       const layout = layoutRef.current;
       if (tile && layout) {
         const tileRect = tile.getBoundingClientRect();
         const layoutRect = layout.getBoundingClientRect();
-        return {
+        newCenters[key] = {
           x: tileRect.left + tileRect.width / 2 - layoutRect.left,
           y: tileRect.top + tileRect.height / 2 - layoutRect.top,
         };
+      } else {
+        newCenters[key] = null;
       }
-      return null;
-    };
-    setCenters({
-      top: calc('top'),
-      right: calc('right'),
-      bottom: calc('bottom'),
-      left: calc('left'),
-    });
-  }, [showArrow, currentTransferStep]);
+    }
+    
+    setCenters(newCenters);
+  }, [showArrow, currentTransferStep, playerCount]);
 
   useEffect(() => {
-    const steps = [
-      '1등과의 남은 타일 개수 차이만큼 코인을 전달',
-      '2등과의 남은 타일 개수 차이만큼 코인을 전달',
-      '3등과의 남은 타일 개수 차이만큼 코인을 전달',
-      '결과 집계 완료!'
-    ];
+    // 참가자 인원수에 따라 메시지 배열 동적 생성
+    const generateSteps = (count: number) => {
+      const steps = [];
+      
+              // 1등부터 (count-1)등까지의 메시지 추가
+        for (let i = 1; i < count; i++) {
+          steps.push(`<span class="guide-tag">🔎 GUIDE</span> ${i}등과의 남은 타일 개수 차이만큼 코인을 전달`);
+        }
+      
+      // 마지막에 결과 집계 완료 메시지 추가
+      steps.push('결과 집계 완료!');
+      
+      return steps;
+    };
+    
+    const steps = generateSteps(playerCount);
     let currentStep = 0;
     setTransferMessage(steps[0]);
     setCurrentTransferStep(0);
@@ -157,7 +173,7 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
       }
     }, 4000);
     return () => clearInterval(timer);
-  }, []);
+  }, [playerCount]);
 
   const handlePlayAgain = () => {
     console.log('다시하기');
@@ -174,60 +190,63 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
       <div className="result-container">
         {/* 상단 섹션 - 상대방 정보 */}
         <div className="opponent-section">
-          <div className="circular-layout players-4" ref={layoutRef}>
-            {/* 1등 플레이어 (top) */}
-            <div className="player-box">
-              <div className="player-placeholder">닉네임</div>
-              <div className="tiles-info tiles-info-bottom">
-                <span>0장</span>
-                <div className="tile-count gold" ref={tileRefs.top}>0</div>
-              </div>
-            </div>
-            {/* 2등 플레이어 (right) */}
-            <div className="player-box">
-              <div className="player-placeholder">닉네임</div>
-              <div className="tiles-info tiles-info-left">
-                <span>2장</span>
-                <div className="tile-count silver" ref={tileRefs.right}>2</div>
-              </div>
-            </div>
-            {/* 3등 플레이어 (bottom) */}
-            <div className="player-box">
-              <div className="player-placeholder">닉네임</div>
-              <div className="tiles-info tiles-info-top">
-                <div className="tile-count bronze" ref={tileRefs.bottom}>10</div>
-                <span>5장</span>
-              </div>
-            </div>
-            {/* 4등 플레이어 (left) */}
-            <div className="player-box">
-              <div className="player-placeholder">닉네임</div>
-              <div className="tiles-info tiles-info-right">
-                <span>10장</span>
-                <div className="tile-count black" ref={tileRefs.left}>5</div>
-              </div>
-            </div>
+          <div className={`circular-layout players-${playerCount}`} ref={layoutRef}>
+            {/* 플레이어 박스들을 동적으로 생성 */}
+            {Array.from({ length: playerCount }, (_, index) => {
+              const rank = index + 1;
+              const tileCounts = [0, 2, 10, 5, 8]; // 예시 데이터
+              const tileCount = tileCounts[index] || 0;
+              const rankColors = ['gold', 'silver', 'bronze', 'black', 'black'];
+              const rankColor = rankColors[index] || 'gray';
+              
+              return (
+                <div key={index} className="player-box">
+                  <div className="player-placeholder">닉네임</div>
+                  <div className="tiles-info">
+                    <span className="remaining-count">{tileCount}장</span>
+                    <div className={`tile-count ${rankColor}`} ref={tileRefs[`player${index}` as keyof typeof tileRefs]}>
+                      {tileCount}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
             {/* SVG 화살표 */}
             {showArrow && (
               <>
-                {/* 1등 전달: 왼쪽, 아래쪽, 오른쪽 -> 위쪽 */}
-                {currentTransferStep === 0 && (
-                  <>
-                    <AnimatedArrow from={centers.left} to={centers.top} visible={true} />
-                    <AnimatedArrow from={centers.bottom} to={centers.top} visible={true} />
-                    <AnimatedArrow from={centers.right} to={centers.top} visible={true} />
-                  </>
+                {/* 플레이어 수에 따른 화살표 애니메이션 */}
+                {currentTransferStep === 0 && playerCount >= 2 && (
+                  <AnimatedArrow from={centers.player1} to={centers.player0} visible={true} />
                 )}
-                {/* 2등 전달: 왼쪽, 아래쪽 -> 오른쪽 */}
-                {currentTransferStep === 1 && (
-                  <>
-                    <AnimatedArrow from={centers.left} to={centers.right} visible={true} />
-                    <AnimatedArrow from={centers.bottom} to={centers.right} visible={true} />
-                  </>
+                {currentTransferStep === 0 && playerCount >= 3 && (
+                  <AnimatedArrow from={centers.player2} to={centers.player0} visible={true} />
                 )}
-                {/* 3등 전달: 아래쪽 -> 왼쪽 */}
-                {currentTransferStep === 2 && (
-                  <AnimatedArrow from={centers.bottom} to={centers.left} visible={true} />
+                {currentTransferStep === 0 && playerCount >= 4 && (
+                  <AnimatedArrow from={centers.player3} to={centers.player0} visible={true} />
+                )}
+                {currentTransferStep === 0 && playerCount >= 5 && (
+                  <AnimatedArrow from={centers.player4} to={centers.player0} visible={true} />
+                )}
+                
+                {currentTransferStep === 1 && playerCount >= 3 && (
+                  <AnimatedArrow from={centers.player2} to={centers.player1} visible={true} />
+                )}
+                {currentTransferStep === 1 && playerCount >= 4 && (
+                  <AnimatedArrow from={centers.player3} to={centers.player1} visible={true} />
+                )}
+                {currentTransferStep === 1 && playerCount >= 5 && (
+                  <AnimatedArrow from={centers.player4} to={centers.player1} visible={true} />
+                )}
+                
+                {currentTransferStep === 2 && playerCount >= 4 && (
+                  <AnimatedArrow from={centers.player3} to={centers.player2} visible={true} />
+                )}
+                {currentTransferStep === 2 && playerCount >= 5 && (
+                  <AnimatedArrow from={centers.player4} to={centers.player2} visible={true} />
+                )}
+                
+                {currentTransferStep === 3 && playerCount >= 5 && (
+                  <AnimatedArrow from={centers.player4} to={centers.player3} visible={true} />
                 )}
               </>
             )}
@@ -237,7 +256,7 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
         {/* 하단 정보 바 */}
         {!showButtons && (
           <div className="transfer-info">
-            <span>{transferMessage}</span>
+            <span dangerouslySetInnerHTML={{ __html: transferMessage }}></span>
           </div>
         )}
 
