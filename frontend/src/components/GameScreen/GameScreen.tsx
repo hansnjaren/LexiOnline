@@ -730,6 +730,20 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       setBoardCards(prev => [...prev.map(card => ({ ...card, isNew: false })), ...newCards]);
     }
     
+    // 하단 패 영역에서 선택된 카드들을 삭제하고 남은 패 개수 업데이트
+    if (success || (boardSize.rows === 4 && boardSize.cols === 15) || (boardSize.rows === 5 && boardSize.cols === 20)) {
+      // 선택된 카드들을 하단 패에서 제거
+      setSortedHand(prev => prev.filter(card => !selectedCards.includes(card.id)));
+      setVisibleHand(prev => prev.filter(card => !selectedCards.includes(card.id)));
+      
+      // 현재 플레이어의 남은 패 개수 업데이트
+      setPlayers(prev => prev.map(player => 
+        player.isCurrentPlayer 
+          ? { ...player, remainingTiles: player.remainingTiles - selectedCards.length }
+          : player
+      ));
+    }
+    
     setSelectedCards([]);
   };
 
