@@ -5,6 +5,7 @@ import './ResultScreen.css';
 
 interface ResultScreenProps {
   onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result') => void;
+  playerCount: number;
 }
 
 // AnimatedArrow 컴포넌트: SVG 화살표 + 애니메이션
@@ -85,7 +86,7 @@ const AnimatedArrow: React.FC<{
   );
 };
 
-const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange }) => {
+const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount }) => {
   const [transferMessage, setTransferMessage] = useState('');
   const [currentTransferStep, setCurrentTransferStep] = useState(0);
   const [showArrow, setShowArrow] = useState(false);

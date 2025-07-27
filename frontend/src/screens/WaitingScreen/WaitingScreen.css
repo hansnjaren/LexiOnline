@@ -139,6 +139,34 @@
   border-color: #667eea;
 }
 
+.player-count-setting {
+  margin-top: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+}
+
+.player-count-setting label {
+  font-weight: bold;
+  color: #333;
+  font-size: 16px;
+}
+
+.player-count-setting select {
+  padding: 8px 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 16px;
+  background-color: white;
+  cursor: pointer;
+}
+
+.player-count-setting select:focus {
+  outline: none;
+  border-color: #ff6b6b;
+}
+
 .controls {
   display: flex;
   justify-content: center;

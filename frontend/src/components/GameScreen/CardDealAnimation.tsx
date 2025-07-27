@@ -182,10 +182,10 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
       let positions: Array<{ x: number; y: number }> = [];
       
       if (playerCount === 3) {
-        // 3명: 2갈래 (나 제외 2명)
+        // 3명: 2갈래 (나 제외 2명) - 맨 위 2줄 사용
         positions = [
-          { x: (22 * window.innerWidth) / 100, y: (15 * window.innerHeight) / 100 }, // 첫 번째 플레이어
-          { x: (22 * window.innerWidth) / 100, y: (25 * window.innerHeight) / 100 }, // 두 번째 플레이어
+          { x: (22 * window.innerWidth) / 100, y: (10 * window.innerHeight) / 100 }, // 첫 번째 플레이어
+          { x: (22 * window.innerWidth) / 100, y: (20 * window.innerHeight) / 100 }, // 두 번째 플레이어
         ];
       } else if (playerCount === 4) {
         // 4명: 4갈래 (나 제외 3명 + 나 포함 4명 모두 표시)

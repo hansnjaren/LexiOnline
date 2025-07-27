@@ -9,9 +9,11 @@ interface Player {
 
 interface WaitingScreenProps {
   onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result') => void;
+  playerCount: number;
+  setPlayerCount: (count: number) => void;
 }
 
-const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange }) => {
+const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCount, setPlayerCount }) => {
   const [players] = useState<Player[]>([
     { id: '1', nickname: '플레이어1', isReady: true },
     { id: '2', nickname: '플레이어2', isReady: false },
@@ -82,6 +84,18 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange }) => {
               <option value={3}>3라운드</option>
               <option value={4}>4라운드</option>
               <option value={5}>5라운드</option>
+            </select>
+          </div>
+          <div className="player-count-setting">
+            <label htmlFor="playerCount">참여 인원수 (디버깅용):</label>
+            <select 
+              id="playerCount" 
+              value={playerCount} 
+              onChange={(e) => setPlayerCount(Number(e.target.value))}
+            >
+              <option value={3}>3명</option>
+              <option value={4}>4명</option>
+              <option value={5}>5명</option>
             </select>
           </div>
         </div>

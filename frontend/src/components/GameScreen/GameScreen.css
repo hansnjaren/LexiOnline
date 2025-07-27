@@ -380,7 +380,7 @@
 
 .my-coins {
   font-size: 1vw;
-  color: #28a745;
+  color: #6c757d;
   font-weight: bold;
   display: flex;
   align-items: center;
@@ -389,7 +389,7 @@
 
 .my-tiles {
   font-size: 1vw;
-  color: rgba(0, 0, 0, 0.616);
+  color: #6c757d;
   font-weight: bold;
   display: flex;
   align-items: center;
