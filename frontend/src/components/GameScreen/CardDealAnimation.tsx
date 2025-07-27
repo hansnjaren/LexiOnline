@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSpring, animated } from '@react-spring/web';
 import './CardDealAnimation.css';
 import sunImage from '../../sun.png';
 import moonImage from '../../moon.png';

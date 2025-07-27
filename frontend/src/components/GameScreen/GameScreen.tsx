@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSpring, animated } from '@react-spring/web';
-import { motion } from 'framer-motion';
+import { motion, useMotionValue, useTransform } from 'framer-motion';
 import './GameScreen.css';
 import coinImage from '../../coin.png';
 import cardImage from '../../card.png';
@@ -26,16 +25,19 @@ interface Player {
 
 // 애니메이션된 남은 패 개수 컴포넌트
 const AnimatedRemainingTiles: React.FC<{ count: number }> = ({ count }) => {
-  const { number } = useSpring({
-    number: count,
-    from: { number: 0 },
-    config: { tension: 300, friction: 20 }
-  });
+  const countMotion = useMotionValue(0);
+  const displayCount = useTransform(countMotion, (value: number) => 
+    String(Math.round(value)).padStart(2, '0')
+  );
+
+  useEffect(() => {
+    countMotion.set(count);
+  }, [count, countMotion]);
 
   return (
-    <animated.span>
-      {number.to(n => String(Math.round(n)).padStart(2, '0'))}
-    </animated.span>
+    <motion.span>
+      {displayCount}
+    </motion.span>
   );
 };
 

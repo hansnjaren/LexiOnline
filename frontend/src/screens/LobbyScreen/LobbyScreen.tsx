@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './LobbyScreen.css';
 import logoImage from '../../logo.png';
-import { User } from '../../../../shared/models/User'
-import { GameHistory } from '../../../../shared/models/GameHistory'
+import { User } from '../../shared/models/User'
+import { GameHistory } from '../../shared/models/GameHistory'
 
 interface LobbyScreenProps {
   onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result') => void;
