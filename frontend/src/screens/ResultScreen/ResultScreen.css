@@ -26,17 +26,17 @@
   height: 95%;
   display: grid;
   grid-template-rows: 1fr auto auto;
-  gap: 10px 10px;
-  row-gap: 10px;
+  gap: 1vh 1vw;
+  row-gap: 1vh;
   background: linear-gradient(145deg, rgba(26, 26, 26, 0.95) 0%, rgba(26, 26, 26, 0.9) 100%);
-  border: 3px solid transparent;
-  border-radius: 20px;
-  padding: 20px;
+  border: 0.3vh solid transparent;
+  border-radius: 2vh;
+  padding: 2vh 2vw;
   box-shadow: 
-    0 20px 40px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.15) inset,
-    0 0 20px rgba(255, 255, 255, 0.05) inset;
-  backdrop-filter: blur(10px);
+    0 2vh 4vh rgba(0, 0, 0, 0.5),
+    0 0 0 0.1vh rgba(255, 255, 255, 0.15) inset,
+    0 0 2vh rgba(255, 255, 255, 0.05) inset;
+  backdrop-filter: blur(1vh);
   position: relative;
   z-index: 1;
 }
@@ -51,14 +51,14 @@
 .opponent-info {
   display: flex;
   align-items: center;
-  gap: 40px;
+  gap: 4vw;
 }
 
 /* 원형 배치를 위한 컨테이너 */
 .circular-layout {
   position: relative;
-  width: 600px;
-  height: 600px;
+  width: 60vw;
+  height: 60vh;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -72,25 +72,25 @@
   align-items: center;
   justify-content: center;
   width: auto;
-  height: 70px;
+  height: 7vh;
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 15px;
+  border: 0.2vh solid rgba(255, 255, 255, 0.2);
+  border-radius: 1.5vh;
   padding: 0 3vw;
   box-shadow: 
-    0 8px 25px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(255, 255, 255, 0.1) inset,
-    0 0 15px rgba(255, 255, 255, 0.05) inset;
+    0 0.8vh 2.5vh rgba(0, 0, 0, 0.3),
+    0 0 0 0.1vh rgba(255, 255, 255, 0.1) inset,
+    0 0 1.5vh rgba(255, 255, 255, 0.05) inset;
   transition: all 0.3s ease;
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(0.5vh);
 }
 
 .player-box:hover {
   transform: scale(1.05);
   box-shadow: 
-    0 12px 35px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.3) inset,
-    0 0 25px rgba(255, 255, 255, 0.1) inset;
+    0 1.2vh 3.5vh rgba(0, 0, 0, 0.4),
+    0 0 0 0.1vh rgba(255, 255, 255, 0.3) inset,
+    0 0 2.5vh rgba(255, 255, 255, 0.1) inset;
   border-color: rgba(255, 255, 255, 0.4);
 }
 
@@ -115,12 +115,12 @@
 /* 유저 정보 스타일 */
 .player-placeholder {
   width: auto;
-  height: 40px;
+  height: 4vh;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 18px;
+  font-size: 1.8vh;
   color: #ffffff;
 }
 
@@ -128,8 +128,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  font-size: 18px;
+  gap: 0.8vh;
+  font-size: 1.8vh;
   text-align: center;
   position: absolute;
 }
@@ -145,13 +145,13 @@
 
 .tiles-info span {
   background: rgba(255, 255, 255, 0.1);
-  padding: 4px 12px;
-  border-radius: 16px;
+  padding: 0.4vh 1.2vw;
+  border-radius: 1.6vh;
   font-weight: 600;
   color: #ffffff;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(5px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0.3vh 0.8vh rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(0.5vh);
+  border: 0.1vh solid rgba(255, 255, 255, 0.2);
 }
 
 /* 3명 플레이어용 - 각 플레이어별 정확한 위치 지정 */
@@ -193,11 +193,11 @@
 }
 
 .circular-layout.players-4 .player-box:nth-child(2) .tiles-info .tile-count {
-  transform: rotate(90deg) translateY(22vh) rotate(-90deg) translateY(-2vh);
+  transform: rotate(90deg) translateY(23vh) rotate(-90deg) translateY(-2vh);
 }
 
 .circular-layout.players-4 .player-box:nth-child(3) .tiles-info .remaining-count {
-  transform: rotate(180deg) translateY(10.5vh) rotate(-180deg);
+  transform: rotate(180deg) translateY(10vh) rotate(-180deg);
 }
 
 .circular-layout.players-4 .player-box:nth-child(3) .tiles-info .tile-count {
@@ -209,7 +209,7 @@
 }
 
 .circular-layout.players-4 .player-box:nth-child(4) .tiles-info .tile-count {
-  transform: rotate(270deg) translateY(22vh) rotate(-270deg) translateY(-2vh);
+  transform: rotate(270deg) translateY(23vh) rotate(-270deg) translateY(-2vh);
 }
 
 /* 5명 플레이어용 - 각 플레이어별 정확한 위치 지정 */
@@ -226,7 +226,7 @@
 }
 
 .circular-layout.players-5 .player-box:nth-child(2) .tiles-info .tile-count {
-  transform: rotate(72deg) translateY(20vh) rotate(-72deg);
+  transform: rotate(72deg) translateY(22vh) rotate(-72deg);
 }
 
 .circular-layout.players-5 .player-box:nth-child(3) .tiles-info .remaining-count {
@@ -250,19 +250,19 @@
 }
 
 .circular-layout.players-5 .player-box:nth-child(5) .tiles-info .tile-count {
-  transform: rotate(288deg) translateY(20vh) rotate(-288deg);
+  transform: rotate(288deg) translateY(22vh) rotate(-288deg);
 }
 
 .tile-count {
-  width: 40px;
-  height: 28px;
-  border: 3px solid;
+  width: 4vw;
+  height: 2.8vh;
+  border: 0.3vh solid;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 20px;
+  font-size: 2vh;
 }
 
 .tile-count.gold {
@@ -296,13 +296,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
+  gap: 0.4vh;
+  font-size: 1.2vh;
   font-weight: bold;
 }
 
 .arrow {
-  font-size: 16px;
+  font-size: 1.6vh;
   font-weight: bold;
 }
 
@@ -310,14 +310,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 1vh;
 }
 
 .opponent-right {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 1vh;
 }
 
 /* 중앙 섹션 - 게임 보드 */
@@ -351,64 +351,64 @@
 
 .slot-group {
   display: flex;
-  gap: 5px;
+  gap: 0.5vw;
 }
 
 .slot {
-  width: 50px;
-  height: 70px;
-  border: 2px solid #333;
+  width: 5vw;
+  height: 7vh;
+  border: 0.2vh solid #333;
   background-color: #f9f9f9;
-  border-radius: 4px;
+  border-radius: 0.4vh;
 }
 
 .group-2 {
-  gap: 10px;
+  gap: 1vw;
 }
 
 .group-3 {
-  gap: 8px;
+  gap: 0.8vw;
 }
 
 .group-4 {
-  gap: 6px;
+  gap: 0.6vw;
 }
 
 .group-5 {
-  gap: 5px;
+  gap: 0.5vw;
 }
 
 /* 하단 섹션 - 플레이어 정보 및 컨트롤 */
 .player-section {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 2vw;
 }
 
 .player-hand {
   display: flex;
-  gap: 5px;
+  gap: 0.5vw;
   flex: 1;
 }
 
 .card-slot {
-  width: 45px;
-  height: 65px;
-  border: 2px solid #333;
+  width: 4.5vw;
+  height: 6.5vh;
+  border: 0.2vh solid #333;
   background-color: #f9f9f9;
-  border-radius: 4px;
+  border-radius: 0.4vh;
 }
 
 .player-controls {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 1.5vw;
 }
 
 .sort-buttons {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0.8vh;
 }
 
 /*
@@ -478,69 +478,69 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 1vh;
 }
 
 /* 하단 정보 바 */
 .transfer-info {
   text-align: center;
-  padding: 8px 16px;
+  padding: 0.8vh 1.6vw;
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.9) 0%, rgba(240, 248, 255, 0.8) 100%);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 12px;
+  border: 0.2vh solid rgba(255, 255, 255, 0.3);
+  border-radius: 1.2vh;
   font-weight: bold;
-  font-size: 18px;
+  font-size: 1.8vh;
   color: #333;
-  width: 600px;
-  height: 40px;
+  width: 60vw;
+  height: 4vh;
   margin: 0 auto;
   margin-bottom: 3vh;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 
-    0 6px 20px rgba(0, 0, 0, 0.1),
-    0 0 0 1px rgba(255, 255, 255, 0.2) inset;
-  backdrop-filter: blur(5px);
+    0 0.6vh 2vh rgba(0, 0, 0, 0.1),
+    0 0 0 0.1vh rgba(255, 255, 255, 0.2) inset;
+  backdrop-filter: blur(0.5vh);
 }
 
 .transfer-info span {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.8vw;
 }
 
 .guide-tag {
   background: linear-gradient(145deg, #667eea 0%, #764ba2 100%);
   color: white;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 14px;
+  padding: 0.4vh 1.2vw;
+  border-radius: 2vh;
+  font-size: 1.4vh;
   font-weight: bold;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  margin-right: 8px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0.2vh 0.8vh rgba(102, 126, 234, 0.3);
+  border: 0.1vh solid rgba(255, 255, 255, 0.2);
+  margin-right: 0.8vw;
+  text-shadow: 0 0.1vh 0.2vh rgba(0, 0, 0, 0.3);
 }
 
 /* 컨트롤 버튼들 */
 .controls {
   display: flex;
   justify-content: center;
-  gap: 15px;
+  gap: 1.5vw;
   margin-bottom: 4vh;
   width: 100%;
 }
 
 .btn {
-  padding: 14px 28px;
+  padding: 1.4vh 2.8vw;
   border: none;
-  border-radius: 12px;
-  font-size: 16px;
+  border-radius: 1.2vh;
+  font-size: 1.6vh;
   font-weight: bold;
   cursor: pointer;
   transition: all 0.3s;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 0.6vh 2vh rgba(0, 0, 0, 0.15);
   position: relative;
   overflow: hidden;
 }
@@ -567,8 +567,8 @@
 
 .btn-primary:hover {
   background: linear-gradient(145deg, #5a6fd8 0%, #6a4c93 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+  transform: translateY(-0.2vh);
+  box-shadow: 0 0.8vh 2.5vh rgba(102, 126, 234, 0.4);
 }
 
 .btn-secondary {
@@ -578,8 +578,8 @@
 
 .btn-secondary:hover {
   background: linear-gradient(145deg, #5a6268 0%, #343a40 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(108, 117, 125, 0.4);
+  transform: translateY(-0.2vh);
+  box-shadow: 0 0.8vh 2.5vh rgba(108, 117, 125, 0.4);
 }
 
 .arrow-svg {
