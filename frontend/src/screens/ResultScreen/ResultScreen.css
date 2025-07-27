@@ -239,6 +239,7 @@
 }
 
 /* 중앙 섹션 - 게임 보드 */
+/*
 .game-board-section {
   display: flex;
   justify-content: center;
@@ -264,6 +265,7 @@
   align-items: center;
   gap: 3px;
 }
+  */
 
 .slot-group {
   display: flex;

@@ -56,8 +56,8 @@ const AnimatedArrow: React.FC<{
   const currentEndX = startX + (endX - startX) * progress;
   const currentEndY = startY + (endY - startY) * progress;
   // 화살촉 좌표 (현재 끝점에서 더 나아간 위치)
-  const arrowHeadX = currentEndX + (ARROW_HEAD_SIZE * 0.36) * Math.cos(angle);
-  const arrowHeadY = currentEndY + (ARROW_HEAD_SIZE * 0.36) * Math.sin(angle);
+  const arrowHeadX = currentEndX + (ARROW_HEAD_SIZE * 0.4) * Math.cos(angle);
+  const arrowHeadY = currentEndY + (ARROW_HEAD_SIZE * 0.4) * Math.sin(angle);
 
   return (
     <svg className="arrow-svg" width="600" height="600" style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 20 }}>

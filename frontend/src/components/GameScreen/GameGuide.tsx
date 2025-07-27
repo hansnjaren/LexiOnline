@@ -57,11 +57,11 @@ const GameGuide: React.FC<GameGuideProps> = ({ isOpen, onClose }) => {
             <div className="mode-explanation">
               <div className="mode-item">
                 <h4>초보 모드</h4>
-                <p>카드가 금색, 은색, 동색, 검정색으로 구분됩니다.</p>
+                <p>금색, 은색, 동색, 검정색으로 구분</p>
               </div>
               <div className="mode-item">
                 <h4>일반 모드</h4>
-                <p>카드가 태양, 달, 별, 구름 모양으로 구분됩니다.</p>
+                <p>태양, 달, 별, 구름 모양으로 구분</p>
               </div>
             </div>
           </div>

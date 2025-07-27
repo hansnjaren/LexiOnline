@@ -22,6 +22,13 @@
   overflow-y: auto;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
   position: relative;
+  /* 스크롤바 숨기기 */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.combination-guide-modal::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .guide-header {
@@ -41,7 +48,7 @@
 
 .guide-header h2 {
   color: #8b4513;
-  font-size: 28px;
+  font-size: 2.2vw;
   font-weight: bold;
   margin: 0;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
@@ -54,7 +61,7 @@
   border-radius: 50%;
   width: 40px;
   height: 40px;
-  font-size: 24px;
+  font-size: 1.9vw;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -74,7 +81,7 @@
   border-radius: 50%;
   width: 40px;
   height: 40px;
-  font-size: 20px;
+  font-size: 1.6vw;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -103,7 +110,7 @@
 
 .combination-section h3 {
   color: #8b4513;
-  font-size: 18px;
+  font-size: 1.4vw;
   font-weight: bold;
   margin: 0 0 15px 0;
   text-align: center;
@@ -130,6 +137,39 @@
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
 }
 
+/* 초보모드 색상 스타일 */
+.guide-card.gold {
+  background: linear-gradient(135deg, #ffd700 0%, #ffb347 100%);
+}
+
+.guide-card.gold .guide-card-value {
+  color: #333;
+}
+
+.guide-card.silver {
+  background: linear-gradient(135deg, #c0c0c0 0%, #a9a9a9 100%);
+}
+
+.guide-card.silver .guide-card-value {
+  color: #333;
+}
+
+.guide-card.bronze {
+  background: linear-gradient(135deg, #8b4513 0%, #654321 100%);
+}
+
+.guide-card.bronze .guide-card-value {
+  color: #fff;
+}
+
+.guide-card.black {
+  background: linear-gradient(135deg, #343a40 0%, #212529 100%);
+}
+
+.guide-card.black .guide-card-value {
+  color: #fff;
+}
+
 .guide-card-image {
   position: absolute;
   top: 0;
@@ -148,19 +188,19 @@
   z-index: 2;
   color: white;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 1.1vw;
 }
 
 .comparison-arrow {
   color: #8b4513;
-  font-size: 24px;
+  font-size: 1.9vw;
   font-weight: bold;
   margin: 0 5px;
 }
 
 .arrow-down {
   color: #8b4513;
-  font-size: 20px;
+  font-size: 1.6vw;
   font-weight: bold;
   margin-left: 10px;
 }
@@ -208,7 +248,7 @@
 .straight-label span, .straightflush-label span {
   color: #8b4513;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 1.1vw;
 }
 
 /* 반응형 디자인 */
@@ -224,7 +264,7 @@
   }
   
   .guide-card-value {
-    font-size: 12px;
+    font-size: 1.2vw;
   }
   
   .combination-example {
@@ -232,6 +272,6 @@
   }
   
   .comparison-arrow {
-    font-size: 20px;
+    font-size: 2vw;
   }
 } 

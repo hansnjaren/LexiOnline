@@ -28,6 +28,7 @@ interface Card {
   cardIndex: number;
   isDealt: boolean;
   isFlipped: boolean;
+  isArrived: boolean; // 목적지에 도착했는지 여부
 }
 
 const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
@@ -89,7 +90,8 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
             playerIndex,
             cardIndex: i,
             isDealt: false,
-            isFlipped: false
+            isFlipped: false,
+            isArrived: false
           });
         }
       }
@@ -148,8 +150,8 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
 
   // 중앙 카드더미 위치 계산
   const centerPosition = {
-    x: window.innerWidth / 2 - 21, // 42px/2
-    y: window.innerHeight / 2 - 30 // 60px/2
+    x: window.innerWidth / 2 - ((3.5 * window.innerWidth) / 100) / 2, // 3.5vw/2
+    y: window.innerHeight / 2 - ((5 * window.innerWidth) / 100) / 2 // 5vw/2
   };
 
   // 각 플레이어 위치 계산 (직선 이동)
@@ -158,23 +160,52 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
       // 내 위치는 getMyCardPosition에서 처리
       return getMyCardPosition(cards.filter(c => c.playerIndex === myPlayerIndex && c.isDealt).length);
     } else {
-      // 다른 플레이어 위치 (실제 UI 요소 기반)
-      const playerElements = document.querySelectorAll('.player-info-container');
-      if (playerElements[playerIndex]) {
-        const playerRect = playerElements[playerIndex].getBoundingClientRect();
-        return {
-          x: playerRect.left + (playerRect.width / 2) - 21, // 카드 중앙 정렬
-          y: playerRect.top + (playerRect.height / 2) - 30
-        };
+      // 나를 제외한 다른 플레이어들의 위치를 동적으로 계산
+      const otherPlayers = Array.from({ length: playerCount }, (_, i) => i).filter(i => i !== myPlayerIndex);
+      const playerIndexInOthers = otherPlayers.indexOf(playerIndex);
+      
+      // 디버깅용 로그
+      console.log('CardDealAnimation Debug:', {
+        playerCount,
+        myPlayerIndex,
+        playerIndex,
+        otherPlayers,
+        playerIndexInOthers
+      });
+      
+      if (playerIndexInOthers === -1) {
+        // 예상치 못한 플레이어 인덱스인 경우 기본 위치 반환
+        return { x: (22 * window.innerWidth) / 100, y: (15 * window.innerHeight) / 100 };
       }
       
-      // 폴백: 기존 위치
-      const positions = [
-        { x: 180, y: 120 },
-        { x: 180, y: 220 },
-        { x: 180, y: 320 },
-      ];
-      return positions[playerIndex] || { x: 180, y: 200 };
+      // 플레이어 수에 따라 위치 조정
+      let positions: Array<{ x: number; y: number }> = [];
+      
+      if (playerCount === 3) {
+        // 3명: 2갈래 (나 제외 2명)
+        positions = [
+          { x: (22 * window.innerWidth) / 100, y: (15 * window.innerHeight) / 100 }, // 첫 번째 플레이어
+          { x: (22 * window.innerWidth) / 100, y: (25 * window.innerHeight) / 100 }, // 두 번째 플레이어
+        ];
+      } else if (playerCount === 4) {
+        // 4명: 4갈래 (나 제외 3명 + 나 포함 4명 모두 표시)
+        positions = [
+          { x: (22 * window.innerWidth) / 100, y: (10 * window.innerHeight) / 100 }, // 첫 번째 플레이어
+          { x: (22 * window.innerWidth) / 100, y: (20 * window.innerHeight) / 100 }, // 두 번째 플레이어
+          { x: (22 * window.innerWidth) / 100, y: (30 * window.innerHeight) / 100 }, // 세 번째 플레이어
+          { x: (22 * window.innerWidth) / 100, y: (40 * window.innerHeight) / 100 }, // 네 번째 플레이어 (나)
+        ];
+      } else if (playerCount === 5) {
+        // 5명: 4갈래 (나 제외 4명)
+        positions = [
+          { x: (22 * window.innerWidth) / 100, y: (8 * window.innerHeight) / 100 },  // 첫 번째 플레이어
+          { x: (22 * window.innerWidth) / 100, y: (18 * window.innerHeight) / 100 }, // 두 번째 플레이어
+          { x: (22 * window.innerWidth) / 100, y: (28 * window.innerHeight) / 100 }, // 세 번째 플레이어
+          { x: (22 * window.innerWidth) / 100, y: (38 * window.innerHeight) / 100 }, // 네 번째 플레이어
+        ];
+      }
+      
+      return positions[playerIndexInOthers] || { x: (22 * window.innerWidth) / 100, y: (15 * window.innerHeight) / 100 };
     }
   };
 
@@ -186,14 +217,14 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
     if (myHandElement) {
       const handRect = myHandElement.getBoundingClientRect();
       
-      // .my-hand 내부에서의 카드 위치 계산
-      const cardWidth = 42; // hand-tile width
-      const cardGap = 6; // gap between cards
+      // .my-hand 내부에서의 카드 위치 계산 (동적 크기)
+      const cardWidth = (3.5 * window.innerWidth) / 100; // 3.5vw를 px로 변환
+      const cardGap = 4; // gap between cards (4px)
       const cardSpacing = cardWidth + cardGap;
       
-      // .my-hand의 시작 위치에서 카드 인덱스에 따른 위치 계산
-      const cardX = handRect.left + (cardIndex * cardSpacing);
-      const cardY = handRect.top;
+      // .my-hand의 시작 위치에서 카드 인덱스에 따른 위치 계산 (왼쪽 위로 조정)
+      const cardX = handRect.left + (cardIndex * cardSpacing) - (0 * window.innerWidth) / 100; // 3vw 왼쪽으로
+      const cardY = handRect.top - (4 * window.innerHeight) / 100; // 4vh 위쪽으로 이동
       
       return {
         x: cardX,
@@ -201,11 +232,14 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
       };
     }
     
-    // 폴백: 기존 계산 방식 (더 정확한 위치)
-    const baseX = window.innerWidth / 2 - (myHand.length * 48) / 2;
+    // 폴백: 기존 계산 방식 (동적 크기 적용) - 왼쪽 위로 이동
+    const cardWidth = (3.5 * window.innerWidth) / 100;
+    const cardGap = 4;
+    const cardSpacing = cardWidth + cardGap;
+    const baseX = (10 * window.innerWidth) / 100 - (myHand.length * cardSpacing) / 2; // 10vw 왼쪽으로 이동
     return {
-      x: baseX + cardIndex * 48,
-      y: window.innerHeight - 120
+      x: baseX + cardIndex * cardSpacing,
+      y: (10 * window.innerHeight) / 100 // 10vh 위쪽으로 이동
     };
   };
 
@@ -234,11 +268,12 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
                 y: card.isDealt ? targetPosition.y : centerPosition.y,
                 rotateY: isMyCard ? (card.isFlipped ? 0 : 180) : 180,
                 scale: 1,
-                opacity: card.isDealt ? (isMyCard ? 1 : 0) : 1
+                opacity: card.isDealt ? (isMyCard ? 1 : (card.isArrived ? 0 : 1)) : 1
               }}
               transition={{
                 duration: 0.4,
-                ease: 'easeOut'
+                ease: 'easeOut',
+                opacity: { duration: 0 } // opacity는 즉시 변경 (애니메이션 없음)
               }}
               onAnimationComplete={() => {
                 if (isMyCard && card.isDealt && !card.isFlipped) {
@@ -249,6 +284,11 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
                   if (onMyCardDealt) {
                     onMyCardDealt(card.cardIndex);
                   }
+                } else if (!isMyCard && card.isDealt && !card.isArrived) {
+                  // 다른 플레이어 카드가 목적지에 도착하면 즉시 사라지도록 isArrived를 true로 설정
+                  setCards(prev => prev.map((c) =>
+                    c.id === card.id ? { ...c, isArrived: true } : c
+                  ));
                 }
               }}
               style={{
