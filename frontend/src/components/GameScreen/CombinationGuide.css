@@ -170,6 +170,39 @@
   color: #fff;
 }
 
+/* 일반모드 색상 스타일 (my-hand와 동일하게) */
+.guide-card.sun {
+  background: transparent;
+}
+
+.guide-card.sun .guide-card-value {
+  color: #ff0000;
+}
+
+.guide-card.moon {
+  background: transparent;
+}
+
+.guide-card.moon .guide-card-value {
+  color: #00ff00;
+}
+
+.guide-card.star {
+  background: transparent;
+}
+
+.guide-card.star .guide-card-value {
+  color: #ffd700;
+}
+
+.guide-card.cloud {
+  background: transparent;
+}
+
+.guide-card.cloud .guide-card-value {
+  color: #40e0d0;
+}
+
 .guide-card-image {
   position: absolute;
   top: 0;

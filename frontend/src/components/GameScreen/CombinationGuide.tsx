@@ -9,7 +9,7 @@ interface CombinationGuideProps {
   isOpen: boolean;
   onClose: () => void;
   onShowGameGuide: () => void;
-  gameMode: 'beginner' | 'normal';
+  gameMode: 'easyMode' | 'normal';
 }
 
 const CombinationGuide: React.FC<CombinationGuideProps> = ({ isOpen, onClose, onShowGameGuide, gameMode }) => {
@@ -24,8 +24,8 @@ const CombinationGuide: React.FC<CombinationGuideProps> = ({ isOpen, onClose, on
   };
 
   // 현재 모드에 맞는 카드 색상 반환
-  const getDisplayColor = (originalColor: string, mode: 'beginner' | 'normal') => {
-    if (mode === 'beginner') {
+  const getDisplayColor = (originalColor: string, mode: 'easyMode' | 'normal') => {
+    if (mode === 'easyMode') {
       return originalColor;
     } else {
       return colorMapping[originalColor as keyof typeof colorMapping] || originalColor;

@@ -45,7 +45,7 @@ const AnimatedRemainingTiles: React.FC<{ count: number }> = ({ count }) => {
 
 const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) => {
   const [currentCombination, setCurrentCombination] = useState<string>('');
-  const [gameMode, setGameMode] = useState<'beginner' | 'normal'>('beginner');
+  const [gameMode, setGameMode] = useState<'easyMode' | 'normal'>('easyMode');
   const [selectedCards, setSelectedCards] = useState<number[]>([]);
   const [boardCards, setBoardCards] = useState<Array<{
     id: number;
@@ -135,6 +135,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       // 카드 제출 로직 추가 예정
     });
 
+    room.onMessage('gameStarted', (message) => {
+      console.log('게임 시작:', message);
+      // 백엔드에서 받은 easyMode 상태로 프론트엔드 상태 동기화
+      if (message.easyMode !== undefined) {
+        setGameMode(message.easyMode ? 'easyMode' : 'normal');
+      }
+    });
+
     // 방에서 나갈 때 정리
     return () => {
       room.onLeave(() => {
@@ -157,8 +165,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   };
 
   // 현재 모드에 맞는 카드 색상 반환
-  const getDisplayColor = (originalColor: string, mode: 'beginner' | 'normal') => {
-    if (mode === 'beginner') {
+  const getDisplayColor = (originalColor: string, mode: 'easyMode' | 'normal') => {
+    if (mode === 'easyMode') {
       return originalColor;
     } else {
       return colorMapping[originalColor as keyof typeof colorMapping] || originalColor;
@@ -820,7 +828,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     setIsSorting(true);
     
     // 정렬된 순서 계산
-    const colorOrder = gameMode === 'beginner' 
+        const colorOrder = gameMode === 'easyMode'
       ? ['gold', 'silver', 'bronze', 'black']
       : ['sun', 'moon', 'star', 'cloud'];
     const sorted = [...sortedHand].sort((a, b) => {
@@ -863,9 +871,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   };
 
   const handleModeChange = () => {
-    const newMode = gameMode === 'beginner' ? 'normal' : 'beginner';
+    const newMode = gameMode === 'easyMode' ? 'normal' : 'easyMode';
     setGameMode(newMode);
-    // 카드 색상은 고정되어 있으므로 변경하지 않음
+    
+    // 백엔드에 easyMode 상태 전송
+    const room = ColyseusService.getRoom();
+    if (room) {
+      room.send('easyMode', { easyMode: newMode === 'easyMode' });
+    }
   };
 
   return (
@@ -880,7 +893,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         myHand={myHand}
         onPlayerCardReceived={handlePlayerCardReceived}
         onMyCardDealt={handleMyCardDealt}
-        gameMode={gameMode}
+        gameMode={gameMode as 'easyMode' | 'normal'}
       />
       
       <div className="game-container">
@@ -978,7 +991,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
                   onClick={showCardDealAnimation ? undefined : handleModeChange}
                   disabled={showCardDealAnimation}
                 >
-                  {gameMode === 'beginner' ? '초보모드' : '일반모드'}
+                  {gameMode === 'easyMode' ? '초보모드' : '일반모드'}
                 </button>
               </div>
             </div>
