@@ -8,10 +8,24 @@
  *
  * See: https://docs.colyseus.io/server/api/#constructor-options
  */
+
 import { listen } from "@colyseus/tools";
-
-// Import Colyseus config
 import app from "./app.config";
+import { PrismaClient } from "@prisma/client";
 
-// Create and listen on 2567 (or PORT environment variable.)
-listen(app);
+const prisma = new PrismaClient();
+
+async function main() {
+  try {
+    await prisma.$connect();
+    console.log("✅ Prisma connected successfully.");
+    // Express + Colyseus
+    listen(app); // 이 app에는 Express가 탑재된 상태
+    console.log("🚀 Colyseus server is listening...");
+  } catch (error) {
+    console.error("❌ Failed to connect Prisma:", error);
+    process.exit(1);
+  }
+}
+
+main();

@@ -3,6 +3,7 @@
     "prisma": "^6.12.0"
   },
   "dependencies": {
+    "react-router-dom": "^7.7.1",
     "@prisma/client": "^6.12.0"
   }
 }

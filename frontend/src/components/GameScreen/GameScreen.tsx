@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSpring, animated } from '@react-spring/web';
-import { motion } from 'framer-motion';
+import { motion, useMotionValue, useTransform } from 'framer-motion';
 import './GameScreen.css';
 import coinImage from '../../coin.png';
 import cardImage from '../../card.png';
@@ -11,9 +10,11 @@ import cloudImage from '../../cloud.png';
 import CombinationGuide from './CombinationGuide';
 import GameGuide from './GameGuide';
 import CardDealAnimation from './CardDealAnimation';
+import ColyseusService from '../../services/ColyseusService';
 
 interface GameScreenProps {
   onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result') => void;
+  playerCount: number;
 }
 
 interface Player {
@@ -26,22 +27,25 @@ interface Player {
 
 // 애니메이션된 남은 패 개수 컴포넌트
 const AnimatedRemainingTiles: React.FC<{ count: number }> = ({ count }) => {
-  const { number } = useSpring({
-    number: count,
-    from: { number: 0 },
-    config: { tension: 300, friction: 20 }
-  });
+  const countMotion = useMotionValue(0);
+  const displayCount = useTransform(countMotion, (value: number) => 
+    String(Math.round(value)).padStart(2, '0')
+  );
+
+  useEffect(() => {
+    countMotion.set(count);
+  }, [count, countMotion]);
 
   return (
-    <animated.span>
-      {number.to(n => String(Math.round(n)).padStart(2, '0'))}
-    </animated.span>
+    <motion.span>
+      {displayCount}
+    </motion.span>
   );
 };
 
-const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
+const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) => {
   const [currentCombination, setCurrentCombination] = useState<string>('');
-  const [gameMode, setGameMode] = useState<'beginner' | 'normal'>('beginner');
+  const [gameMode, setGameMode] = useState<'easyMode' | 'normal'>('easyMode');
   const [selectedCards, setSelectedCards] = useState<number[]>([]);
   const [boardCards, setBoardCards] = useState<Array<{
     id: number;
@@ -78,13 +82,74 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
   const [cardOffsets, setCardOffsets] = useState<{ [key: number]: number }>({});
   const handRef = useRef<HTMLDivElement>(null);
   
-  // 플레이어 정보 (이미지에 맞게 수정)
-  const [players, setPlayers] = useState<Player[]>([
-    { id: '1', nickname: '닉네임', coinCount: 12, remainingTiles: 0, isCurrentPlayer: false },
-    { id: '2', nickname: '닉네임', coinCount: 15, remainingTiles: 0, isCurrentPlayer: false },
-    { id: '3', nickname: '닉네임', coinCount: 8, remainingTiles: 0, isCurrentPlayer: false },
-    { id: '4', nickname: '닉네임', coinCount: 20, remainingTiles: 0, isCurrentPlayer: true },
-  ]);
+  // 대기 중인 패 저장 (공간 부족으로 제출하지 못한 패)
+  const [pendingCards, setPendingCards] = useState<Array<{
+    id: number;
+    value: number;
+    color: string;
+  }>>([]);
+  
+  // 플레이어 정보 (플레이어 수에 따라 동적 생성)
+  const [players, setPlayers] = useState<Player[]>(() => {
+    const playerArray: Player[] = [];
+    for (let i = 1; i <= playerCount; i++) {
+      playerArray.push({
+        id: i.toString(),
+        nickname: '닉네임',
+        coinCount: Math.floor(Math.random() * 20) + 5,
+        remainingTiles: 0,
+        isCurrentPlayer: i === playerCount // 마지막 플레이어가 나
+      });
+    }
+    return playerArray;
+  });
+
+  // Colyseus 연결 초기화
+  useEffect(() => {
+    const room = ColyseusService.getRoom();
+    if (!room) {
+      console.error('방에 연결되지 않았습니다.');
+      onScreenChange('lobby');
+      return;
+    }
+
+    // 게임 상태 구독
+    room.onStateChange((state) => {
+      console.log('게임 상태 변경:', state);
+      // 게임 상태에 따른 UI 업데이트 로직 추가 예정
+    });
+
+    // 게임 메시지 수신
+    room.onMessage('gameEnded', (message) => {
+      console.log('게임 종료:', message);
+      onScreenChange('result');
+    });
+
+    room.onMessage('roundStart', (message) => {
+      console.log('라운드 시작:', message);
+      // 라운드 시작 로직 추가 예정
+    });
+
+    room.onMessage('submitted', (message) => {
+      console.log('카드 제출:', message);
+      // 카드 제출 로직 추가 예정
+    });
+
+    room.onMessage('gameStarted', (message) => {
+      console.log('게임 시작:', message);
+      // 백엔드에서 받은 easyMode 상태로 프론트엔드 상태 동기화
+      if (message.easyMode !== undefined) {
+        setGameMode(message.easyMode ? 'easyMode' : 'normal');
+      }
+    });
+
+    // 방에서 나갈 때 정리
+    return () => {
+      room.onLeave(() => {
+        console.log('게임에서 나갔습니다.');
+      });
+    };
+  }, [onScreenChange]);
 
   // 카드 색상 매핑 (초보모드 ↔ 일반모드)
   const colorMapping = {
@@ -100,8 +165,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
   };
 
   // 현재 모드에 맞는 카드 색상 반환
-  const getDisplayColor = (originalColor: string, mode: 'beginner' | 'normal') => {
-    if (mode === 'beginner') {
+  const getDisplayColor = (originalColor: string, mode: 'easyMode' | 'normal') => {
+    if (mode === 'easyMode') {
       return originalColor;
     } else {
       return colorMapping[originalColor as keyof typeof colorMapping] || originalColor;
@@ -151,13 +216,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
     setDealtCards(new Set());
     setVisibleHand([...myHand]); // 모든 카드를 visibleHand에 설정
     
-    // 게임 시작 시 플레이어들의 남은 패 개수를 실제 값으로 설정
-    setPlayers([
-      { id: '1', nickname: '닉네임', coinCount: 12, remainingTiles: 8, isCurrentPlayer: false },
-      { id: '2', nickname: '닉네임', coinCount: 15, remainingTiles: 12, isCurrentPlayer: false },
-      { id: '3', nickname: '닉네임', coinCount: 8, remainingTiles: 15, isCurrentPlayer: false },
-      { id: '4', nickname: '닉네임', coinCount: 20, remainingTiles: 10, isCurrentPlayer: true },
-    ]);
+    // 게임 시작 시 플레이어들의 남은 패 개수를 모두 16으로 설정
+    setPlayers(prev => prev.map((player, index) => ({
+      ...player,
+      remainingTiles: 16
+    })));
     
     // 손패를 정렬된 상태로 설정
     setSortedHand([...myHand]);
@@ -204,6 +267,197 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
       return () => clearTimeout(timer);
     }
   }, [dealtCards.size, sortedHand.length, showCardDealAnimation]);
+
+  // 대기 중인 패들을 보드에 배치하는 함수
+  const submitPendingCards = () => {
+    if (pendingCards.length === 0) return;
+    
+    console.log('submitPendingCards 호출됨, 현재 보드 크기:', boardSize);
+    
+    // 대기 중인 패들을 보드에 추가 (기존 카드는 전혀 건드리지 않음)
+    const newCards = pendingCards.map((card, index) => ({
+      ...card,
+      isNew: true,
+      row: -1,
+      col: -1
+    }));
+    
+                    // 랜덤 위치 찾기 (기존 카드들과 겹치지 않고 좌우 여백 한 칸씩 필수)
+        const findRandomPosition = (currentBoardSize = boardSize) => {
+          // 가능한 모든 위치를 찾아서 랜덤하게 선택
+          const availablePositions: Array<{ row: number; col: number }> = [];
+          
+          // 모든 행에서 시도
+          for (let row = 0; row < currentBoardSize.rows; row++) {
+            // 해당 행의 모든 기존 카드 위치 확인
+            const rowCards = boardCards.filter(c => c.row === row).sort((a, b) => a.col - b.col);
+            
+            // 해당 행에 카드가 없으면 모든 위치가 가능
+            if (rowCards.length === 0) {
+              if (newCards.length <= currentBoardSize.cols) {
+                for (let startCol = 0; startCol <= currentBoardSize.cols - newCards.length; startCol++) {
+                  availablePositions.push({ row, col: startCol });
+                }
+              }
+              continue;
+            }
+            
+            // 기존 카드들 사이의 빈 공간 찾기
+            for (let startCol = 0; startCol <= currentBoardSize.cols - newCards.length; startCol++) {
+              let canPlace = true;
+              
+              // 1. 새로운 카드들이 들어갈 위치에 기존 카드가 있는지 확인
+              for (let i = 0; i < newCards.length; i++) {
+                const col = startCol + i;
+                const existingCard = rowCards.find(c => c.col === col);
+                if (existingCard) {
+                  canPlace = false;
+                  break;
+                }
+              }
+              
+              if (!canPlace) continue;
+              
+              // 2. 좌측 여백 확인 (새로운 카드들 왼쪽에 기존 카드가 있으면 반드시 한 칸 이상 여백 필요)
+              const leftCard = rowCards.find(c => c.col === startCol - 1);
+              if (leftCard) {
+                canPlace = false;
+                continue;
+              }
+              
+              // 3. 우측 여백 확인 (새로운 카드들 오른쪽에 기존 카드가 있으면 반드시 한 칸 이상 여백 필요)
+              const rightCard = rowCards.find(c => c.col === startCol + newCards.length);
+              if (rightCard) {
+                canPlace = false;
+                continue;
+              }
+              
+              if (canPlace) {
+                availablePositions.push({ row, col: startCol });
+              }
+            }
+          }
+          
+          // 가능한 위치가 있으면 랜덤하게 선택
+          if (availablePositions.length > 0) {
+            const randomPosition = availablePositions[Math.floor(Math.random() * availablePositions.length)];
+            
+            // 위치 할당
+            newCards.forEach((card, index) => {
+              card.row = randomPosition.row;
+              card.col = randomPosition.col + index;
+            });
+            return true;
+          }
+          
+          return false;
+        };
+    
+    const success = findRandomPosition();
+    
+    if (success) {
+      setBoardCards(prev => [...prev, ...newCards]);
+      setPendingCards([]); // 대기 중인 패 제거
+    } else {
+      // 25x6에서도 실패한 경우, 여백 압축 시도
+      const compressAndPlace = () => {
+        console.log('submitPendingCards compressAndPlace 시작, newCards 길이:', newCards.length);
+        
+        // 압축은 실제로는 하지 않고, 단순히 새로운 카드를 배치할 수 있는지만 확인
+        for (let targetRow = 0; targetRow < boardSize.rows; targetRow++) {
+          const rowCards = boardCards.filter(c => c.row === targetRow).sort((a, b) => a.col - b.col);
+          console.log(`submitPendingCards 행 ${targetRow}의 카드 수:`, rowCards.length);
+          
+          // 해당 행에 카드가 없으면 바로 배치 가능
+          if (rowCards.length === 0) {
+            console.log(`submitPendingCards 행 ${targetRow}가 비어있어서 바로 배치`);
+            newCards.forEach((card, index) => {
+              card.row = targetRow;
+              card.col = index;
+            });
+            setBoardCards(prev => [...prev, ...newCards]);
+            return true;
+          }
+          
+          // 해당 행에 새로운 카드를 배치할 수 있는지 확인 (압축 없이)
+          // 가능한 모든 위치를 찾아서 랜덤하게 선택
+          const availablePositions: number[] = [];
+          
+          for (let col = 0; col <= boardSize.cols - newCards.length; col++) {
+            let canPlace = true;
+            
+            // 해당 위치에 카드가 있는지 확인
+            for (let i = 0; i < newCards.length; i++) {
+              const existingCard = rowCards.find(c => c.col === col + i);
+              if (existingCard) {
+                canPlace = false;
+                break;
+              }
+            }
+            
+            if (canPlace) {
+              // 기존 카드들과의 여백 확인 (좌우 한 칸 이상 여백 필요)
+              const leftCard = rowCards.find(c => c.col === col - 1);
+              const rightCard = rowCards.find(c => c.col === col + newCards.length);
+              
+              // 좌우에 기존 카드가 있으면 여백이 있어야 함
+              if (leftCard || rightCard) {
+                console.log(`submitPendingCards 위치 ${col}에서 좌우 여백 문제로 배치 불가`);
+                continue; // 이 위치는 사용할 수 없음
+              }
+              
+              availablePositions.push(col);
+            }
+          }
+          
+          // 가능한 위치가 있으면 랜덤하게 선택
+          if (availablePositions.length > 0) {
+            const randomCol = availablePositions[Math.floor(Math.random() * availablePositions.length)];
+            console.log(`submitPendingCards 위치 ${randomCol}에 새로운 카드 배치 성공 (랜덤 선택)`);
+            
+            // 새로운 카드들 배치
+            newCards.forEach((card, index) => {
+              card.row = targetRow;
+              card.col = randomCol + index;
+            });
+            
+            // 새로운 카드만 추가 (기존 카드는 전혀 건드리지 않음)
+            setBoardCards(prev => [...prev, ...newCards]);
+            return true;
+          }
+          
+          console.log(`submitPendingCards 행 ${targetRow}에서 배치 실패`);
+        }
+        
+        return false;
+      };
+      
+      const compressedSuccess = compressAndPlace();
+      if (compressedSuccess) {
+        console.log('submitPendingCards: 압축 성공');
+        setPendingCards([]); // 대기 중인 패 제거
+      } else {
+        console.log('submitPendingCards: 압축 실패');
+        // 압축해도 실패하면 25x6으로 확장 시도
+        if (boardSize.rows === 5 && boardSize.cols === 20) {
+          console.log('submitPendingCards: 25x6으로 확장 시도');
+          setBoardSize({ rows: 6, cols: 25 });
+          // 확장 후 즉시 다시 시도 (useEffect에서 처리됨)
+        } else {
+          console.log('submitPendingCards: 확장 조건 불만족, 현재 보드 크기:', boardSize);
+        }
+      }
+    }
+  };
+
+  // 보드 크기가 변경될 때 대기 중인 패 자동 제출
+  useEffect(() => {
+    if (pendingCards.length > 0) {
+      console.log('useEffect: 보드 크기 변경 감지, submitPendingCards 호출');
+      // 보드 크기 변경 시 즉시 제출 시도
+      submitPendingCards();
+    }
+  }, [boardSize, pendingCards.length]);
 
   const handlePlayerCardReceived = (playerIndex: number) => {
     setPlayers(prev => prev.map((player, index) => 
@@ -299,10 +553,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
   const handleSubmitCards = () => {
     if (selectedCards.length === 0) return;
     
-    // 기존 카드들의 isNew를 false로 변경
-    setBoardCards(prev => prev.map(card => ({ ...card, isNew: false })));
-    
-    // 새로운 카드들을 보드에 추가
+    // 새로운 카드들을 보드에 추가 (기존 카드는 전혀 건드리지 않음)
     const newCards = selectedCards.map((cardId, index) => {
       const card = sortedHand.find(c => c.id === cardId);
       if (!card) return null;
@@ -315,86 +566,70 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
       };
     }).filter((card): card is NonNullable<typeof card> => card !== null);
     
-    // 랜덤 위치 찾기 (기존 카드들과 겹치지 않는)
-    const findRandomPosition = () => {
-      const attempts = 100; // 최대 시도 횟수
+    // 랜덤 위치 찾기 (기존 카드들과 겹치지 않고 좌우 여백 한 칸씩 필수)
+    const findRandomPosition = (currentBoardSize = boardSize) => {
+      // 가능한 모든 위치를 찾아서 랜덤하게 선택
+      const availablePositions: Array<{ row: number; col: number }> = [];
       
-      for (let attempt = 0; attempt < attempts; attempt++) {
-        // 랜덤 행 선택 (현재 보드 크기에 맞춤)
-        const randomRow = Math.floor(Math.random() * boardSize.rows);
+      // 모든 행에서 시도
+      for (let row = 0; row < currentBoardSize.rows; row++) {
+        // 해당 행의 모든 기존 카드 위치 확인
+        const rowCards = boardCards.filter(c => c.row === row).sort((a, b) => a.col - b.col);
         
-        // 해당 행에서 가능한 모든 시작 위치 찾기
-        const possiblePositions = [];
+        // 해당 행에 카드가 없으면 모든 위치가 가능
+        if (rowCards.length === 0) {
+          if (newCards.length <= currentBoardSize.cols) {
+            for (let startCol = 0; startCol <= currentBoardSize.cols - newCards.length; startCol++) {
+              availablePositions.push({ row, col: startCol });
+            }
+          }
+          continue;
+        }
         
-        for (let startCol = 0; startCol <= boardSize.cols - newCards.length; startCol++) {
+        // 기존 카드들 사이의 빈 공간 찾기
+        for (let startCol = 0; startCol <= currentBoardSize.cols - newCards.length; startCol++) {
           let canPlace = true;
           
-          // 연속된 공간이 비어있는지 확인
+          // 1. 새로운 카드들이 들어갈 위치에 기존 카드가 있는지 확인
           for (let i = 0; i < newCards.length; i++) {
             const col = startCol + i;
-            if (col >= boardSize.cols) {
-              canPlace = false;
-              break;
-            }
-            
-            // 해당 위치에 카드가 있는지 확인
-            const existingCard = boardCards.find(c => c.row === randomRow && c.col === col);
+            const existingCard = rowCards.find(c => c.col === col);
             if (existingCard) {
               canPlace = false;
               break;
             }
-            
-            // 좌우 한 칸 여백 확인
-            const leftCard = boardCards.find(c => c.row === randomRow && c.col === col - 1);
-            const rightCard = boardCards.find(c => c.row === randomRow && c.col === col + newCards.length);
-            
-            // 기존 카드와 가로로 이어지는지 확인
-            const hasAdjacentCard = boardCards.some(c => 
-              c.row === randomRow && 
-              (c.col >= startCol - 1 && c.col <= startCol + newCards.length)
-            );
-            
-            if (leftCard || rightCard || hasAdjacentCard) {
-              canPlace = false;
-              break;
-            }
+          }
+          
+          if (!canPlace) continue;
+          
+          // 2. 좌측 여백 확인 (새로운 카드들 왼쪽에 기존 카드가 있으면 반드시 한 칸 이상 여백 필요)
+          const leftCard = rowCards.find(c => c.col === startCol - 1);
+          if (leftCard) {
+            canPlace = false;
+            continue;
+          }
+          
+          // 3. 우측 여백 확인 (새로운 카드들 오른쪽에 기존 카드가 있으면 반드시 한 칸 이상 여백 필요)
+          const rightCard = rowCards.find(c => c.col === startCol + newCards.length);
+          if (rightCard) {
+            canPlace = false;
+            continue;
           }
           
           if (canPlace) {
-            possiblePositions.push(startCol);
+            availablePositions.push({ row, col: startCol });
           }
         }
+      }
+      
+      // 가능한 위치가 있으면 랜덤하게 선택
+      if (availablePositions.length > 0) {
+        const randomPosition = availablePositions[Math.floor(Math.random() * availablePositions.length)];
         
-        // 가능한 위치가 있으면 랜덤하게 선택
-        if (possiblePositions.length > 0) {
-          const randomStartCol = possiblePositions[Math.floor(Math.random() * possiblePositions.length)];
-          
-          // 위치 할당
-          newCards.forEach((card, index) => {
-            card.row = randomRow;
-            card.col = randomStartCol + index;
-          });
-          return true;
-        }
-      }
-      
-      // 적절한 위치를 찾지 못한 경우, 마지막 행에 배치 시도
-      const lastRow = Math.min(boardSize.rows - 1, Math.max(...boardCards.map(c => c.row)) + 1);
-      
-      // 마지막 행에도 공간이 있는지 확인
-      let canPlaceInLastRow = true;
-      for (let i = 0; i < newCards.length; i++) {
-        const existingCard = boardCards.find(c => c.row === lastRow && c.col === i);
-        if (existingCard) {
-          canPlaceInLastRow = false;
-          break;
-        }
-      }
-      
-      if (canPlaceInLastRow) {
+        // 위치 할당
         newCards.forEach((card, index) => {
-          card.row = lastRow;
-          card.col = index;
+          card.row = randomPosition.row;
+          card.col = randomPosition.col + index;
         });
         return true;
       }
@@ -404,90 +639,29 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
     
     // 여백 압축 및 배치 함수
     const compressAndPlace = () => {
-      // 각 행별로 카드 그룹들을 찾기
-      const rowGroups: { [row: number]: Array<{ start: number; end: number; cards: any[] }> } = {};
+      console.log('compressAndPlace 시작, newCards 길이:', newCards.length);
       
-      // 각 행에서 연속된 카드 그룹들을 찾기
-      for (let row = 0; row < boardSize.rows; row++) {
-        const rowCards = boardCards.filter(c => c.row === row).sort((a, b) => a.col - b.col);
-        const groups: Array<{ start: number; end: number; cards: any[] }> = [];
+      // 압축은 실제로는 하지 않고, 단순히 새로운 카드를 배치할 수 있는지만 확인
+      for (let targetRow = 0; targetRow < boardSize.rows; targetRow++) {
+        const rowCards = boardCards.filter(c => c.row === targetRow).sort((a, b) => a.col - b.col);
+        console.log(`행 ${targetRow}의 카드 수:`, rowCards.length);
         
-        if (rowCards.length > 0) {
-          let currentGroup = [rowCards[0]];
-          let currentStart = rowCards[0].col;
-          
-          for (let i = 1; i < rowCards.length; i++) {
-            if (rowCards[i].col === rowCards[i-1].col + 1) {
-              // 연속된 카드
-              currentGroup.push(rowCards[i]);
-            } else {
-              // 새로운 그룹 시작
-              groups.push({
-                start: currentStart,
-                end: rowCards[i-1].col,
-                cards: [...currentGroup]
-              });
-              currentGroup = [rowCards[i]];
-              currentStart = rowCards[i].col;
-            }
-          }
-          
-          // 마지막 그룹 추가
-          groups.push({
-            start: currentStart,
-            end: rowCards[rowCards.length - 1].col,
-            cards: [...currentGroup]
+        // 해당 행에 카드가 없으면 바로 배치 가능
+        if (rowCards.length === 0) {
+          console.log(`행 ${targetRow}가 비어있어서 바로 배치`);
+          newCards.forEach((card, index) => {
+            card.row = targetRow;
+            card.col = index;
           });
+          // 새로운 카드만 추가 (기존 카드는 전혀 건드리지 않음)
+          setBoardCards(prev => [...prev, ...newCards]);
+          return true;
         }
         
-        rowGroups[row] = groups;
-      }
-      
-      // 여백이 2칸 이상인 그룹들을 1칸으로 압축
-      let totalCompressedSpace = 0;
-      const compressedCards: any[] = [];
-      
-      for (let row = 0; row < boardSize.rows; row++) {
-        const groups = rowGroups[row];
-        if (!groups || groups.length === 0) continue;
-        
-        let newCol = 0;
-        for (let i = 0; i < groups.length; i++) {
-          const group = groups[i];
-          const groupLength = group.end - group.start + 1;
+                  // 해당 행에 새로운 카드를 배치할 수 있는지 확인 (압축 없이)
+          // 가능한 모든 위치를 찾아서 랜덤하게 선택
+          const availablePositions: number[] = [];
           
-          // 이전 그룹과의 여백 계산
-          const prevGroupEnd = i > 0 ? groups[i-1].end : -1;
-          const currentGap = group.start - prevGroupEnd - 1;
-          
-          // 여백이 2칸 이상이면 1칸으로 압축 (다른 턴 카드들 사이에는 최소 1칸 여백 유지)
-          const compressedGap = currentGap > 1 ? 1 : currentGap;
-          const spaceSaved = currentGap - compressedGap;
-          totalCompressedSpace += spaceSaved;
-          
-          // 카드들의 새로운 위치 계산
-          const newStart = newCol + (i > 0 ? compressedGap : 0);
-          group.cards.forEach((card, index) => {
-            compressedCards.push({
-              ...card,
-              col: newStart + index
-            });
-          });
-          
-          newCol = newStart + groupLength;
-        }
-      }
-      
-      // 압축된 공간이 새로운 카드들을 넣을 수 있는지 확인
-      if (totalCompressedSpace >= newCards.length) {
-        // 압축된 카드들로 보드 업데이트
-        setBoardCards(compressedCards);
-        
-        // 새로운 카드들을 첫 번째 빈 공간에 배치
-        for (let row = 0; row < boardSize.rows; row++) {
-          const rowCards = compressedCards.filter(c => c.row === row).sort((a, b) => a.col - b.col);
-          
-          // 빈 공간 찾기
           for (let col = 0; col <= boardSize.cols - newCards.length; col++) {
             let canPlace = true;
             
@@ -501,24 +675,37 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
             }
             
             if (canPlace) {
-              // 기존 카드들과의 여백 확인
+              // 기존 카드들과의 여백 확인 (좌우 한 칸 이상 여백 필요)
               const leftCard = rowCards.find(c => c.col === col - 1);
               const rightCard = rowCards.find(c => c.col === col + newCards.length);
               
               // 좌우에 기존 카드가 있으면 여백이 있어야 함
               if (leftCard || rightCard) {
+                console.log(`위치 ${col}에서 좌우 여백 문제로 배치 불가`);
                 continue; // 이 위치는 사용할 수 없음
               }
               
-              // 새로운 카드들 배치
-              newCards.forEach((card, index) => {
-                card.row = row;
-                card.col = col + index;
-              });
-              return true;
+              availablePositions.push(col);
             }
           }
-        }
+          
+          // 가능한 위치가 있으면 랜덤하게 선택
+          if (availablePositions.length > 0) {
+            const randomCol = availablePositions[Math.floor(Math.random() * availablePositions.length)];
+            console.log(`위치 ${randomCol}에 새로운 카드 배치 성공 (랜덤 선택)`);
+            
+            // 새로운 카드들 배치
+            newCards.forEach((card, index) => {
+              card.row = targetRow;
+              card.col = randomCol + index;
+            });
+            
+            // 새로운 카드만 추가 (기존 카드는 전혀 건드리지 않음)
+            setBoardCards(prev => [...prev, ...newCards]);
+            return true;
+          }
+        
+        console.log(`행 ${targetRow}에서 배치 실패`);
       }
       
       return false;
@@ -528,22 +715,81 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
     
     // 위치를 찾지 못한 경우 보드 확장
     if (!success && boardSize.rows === 4 && boardSize.cols === 15) {
+      console.log('15x4에서 20x5로 확장 시도');
+      // 보드 확장만 하고 기존 카드는 전혀 건드리지 않음
       setBoardSize({ rows: 5, cols: 20 });
       // 확장 후 다시 위치 찾기 시도
       setTimeout(() => {
-        const retrySuccess = findRandomPosition();
+        const retrySuccess = findRandomPosition({ rows: 5, cols: 20 });
         if (retrySuccess) {
+          console.log('20x5 확장 성공');
+          // 새로운 카드만 추가 (기존 카드들은 전혀 건드리지 않음)
           setBoardCards(prev => [...prev, ...newCards]);
+          // 확장 성공 후 대기 중인 카드들도 자동으로 등록 시도
+          setTimeout(() => {
+            if (pendingCards.length > 0) {
+              submitPendingCards();
+            }
+          }, 200);
+        } else {
+          console.log('20x5 확장 실패, 대기 중인 패에 저장');
+          // 여전히 실패하면 대기 중인 패에 저장
+          setPendingCards(prev => [...prev, ...newCards]);
         }
       }, 100);
-    } else if (!success && boardSize.rows === 5 && boardSize.cols === 20) {
+    } else if (!success && (boardSize.rows === 5 && boardSize.cols === 20)) {
+      console.log('20x5에서 압축 시도');
       // 20x5에서도 실패한 경우, 여백 압축 시도
       const compressedSuccess = compressAndPlace();
       if (compressedSuccess) {
-        setBoardCards(prev => [...prev, ...newCards]);
+        console.log('압축 성공');
+        // 압축 성공 시 이미 setBoardCards가 호출되었으므로 추가 작업 불필요
+        // 압축 성공 후 대기 중인 카드들도 자동으로 등록 시도
+        setTimeout(() => {
+          if (pendingCards.length > 0) {
+            submitPendingCards();
+          }
+        }, 200);
+      } else {
+        console.log('압축 실패, 25x6으로 확장 시도');
+        // 압축해도 실패하면 25x6으로 확장 (기존 카드는 전혀 건드리지 않음)
+        setBoardSize({ rows: 6, cols: 25 });
+        setTimeout(() => {
+          const retrySuccess = findRandomPosition({ rows: 6, cols: 25 });
+          if (retrySuccess) {
+            console.log('25x6 확장 성공');
+            // 새로운 카드만 추가 (기존 카드들은 전혀 건드리지 않음)
+            setBoardCards(prev => [...prev, ...newCards]);
+            // 확장 성공 후 대기 중인 카드들도 자동으로 등록 시도
+            setTimeout(() => {
+              if (pendingCards.length > 0) {
+                submitPendingCards();
+              }
+            }, 200);
+          } else {
+            console.log('25x6 확장 실패, 대기 중인 패에 저장');
+            // 여전히 실패하면 대기 중인 패에 저장
+            setPendingCards(prev => [...prev, ...newCards]);
+          }
+        }, 100);
       }
     } else if (success) {
-      setBoardCards(prev => [...prev, ...newCards]);
+      // 성공한 경우에만 기존 카드들의 isNew를 false로 설정하고 새로운 카드 추가
+      setBoardCards(prev => [...prev.map(card => ({ ...card, isNew: false })), ...newCards]);
+    }
+    
+    // 하단 패 영역에서 선택된 카드들을 삭제하고 남은 패 개수 업데이트
+    if (success || (boardSize.rows === 4 && boardSize.cols === 15) || (boardSize.rows === 5 && boardSize.cols === 20)) {
+      // 선택된 카드들을 하단 패에서 제거
+      setSortedHand(prev => prev.filter(card => !selectedCards.includes(card.id)));
+      setVisibleHand(prev => prev.filter(card => !selectedCards.includes(card.id)));
+      
+      // 현재 플레이어의 남은 패 개수 업데이트
+      setPlayers(prev => prev.map(player => 
+        player.isCurrentPlayer 
+          ? { ...player, remainingTiles: player.remainingTiles - selectedCards.length }
+          : player
+      ));
     }
     
     setSelectedCards([]);
@@ -560,7 +806,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
     sortedHand.forEach((card, currentIndex) => {
       const newIndex = sorted.findIndex(c => c.id === card.id);
       if (newIndex !== currentIndex) {
-        offsets[card.id] = (newIndex - currentIndex) * 48; // 카드 간격
+        // 카드 간격을 동적으로 계산 (카드 너비 + gap)
+        const cardWidth = handRef.current ? handRef.current.children[0]?.clientWidth || 0 : 0;
+        const gap = 6; // CSS에서 설정된 gap
+        const cardSpacing = cardWidth + gap;
+        offsets[card.id] = (newIndex - currentIndex) * cardSpacing + 6;
       }
     });
     
@@ -571,14 +821,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
       setSortedHand(sorted);
       setCardOffsets({});
       setIsSorting(false);
-    }, 450);
+    }, 800); // CSS 애니메이션 시간과 맞춤
   };
 
   const handleSortByColor = () => {
     setIsSorting(true);
     
     // 정렬된 순서 계산
-    const colorOrder = gameMode === 'beginner' 
+        const colorOrder = gameMode === 'easyMode'
       ? ['gold', 'silver', 'bronze', 'black']
       : ['sun', 'moon', 'star', 'cloud'];
     const sorted = [...sortedHand].sort((a, b) => {
@@ -598,7 +848,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
     sortedHand.forEach((card, currentIndex) => {
       const newIndex = sorted.findIndex(c => c.id === card.id);
       if (newIndex !== currentIndex) {
-        offsets[card.id] = (newIndex - currentIndex) * 48; // 카드 간격
+        // 카드 간격을 동적으로 계산 (카드 너비 + gap)
+        const cardWidth = handRef.current ? handRef.current.children[0]?.clientWidth || 0 : 0;
+        const gap = 6; // CSS에서 설정된 gap
+        const cardSpacing = cardWidth + gap;
+        offsets[card.id] = (newIndex - currentIndex) * cardSpacing;
       }
     });
     
@@ -609,7 +863,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
       setSortedHand(sorted);
       setCardOffsets({});
       setIsSorting(false);
-    }, 450);
+    }, 800); // CSS 애니메이션 시간과 맞춤
   };
 
   const handleViewCombinations = () => {
@@ -617,9 +871,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
   };
 
   const handleModeChange = () => {
-    const newMode = gameMode === 'beginner' ? 'normal' : 'beginner';
+    const newMode = gameMode === 'easyMode' ? 'normal' : 'easyMode';
     setGameMode(newMode);
-    // 카드 색상은 고정되어 있으므로 변경하지 않음
+    
+    // 백엔드에 easyMode 상태 전송
+    const room = ColyseusService.getRoom();
+    if (room) {
+      room.send('easyMode', { easyMode: newMode === 'easyMode' });
+    }
   };
 
   return (
@@ -628,20 +887,20 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
       <CardDealAnimation
         isVisible={showCardDealAnimation}
         onComplete={handleCardDealComplete}
-        playerCount={4}
+        playerCount={players.length}
         cardsPerPlayer={16}
-        myPlayerIndex={3} // 내 플레이어 인덱스 (0부터 시작)
+        myPlayerIndex={players.findIndex(p => p.isCurrentPlayer)} // 현재 플레이어 인덱스
         myHand={myHand}
         onPlayerCardReceived={handlePlayerCardReceived}
         onMyCardDealt={handleMyCardDealt}
-        gameMode={gameMode}
+        gameMode={gameMode as 'easyMode' | 'normal'}
       />
       
       <div className="game-container">
         {/* 상단 좌측 - 다른 플레이어 정보 */}
         <div className="top-left-section">
           <div className="other-players">
-            {players.slice(0, 4).map((player, index) => (
+            {players.filter(player => !player.isCurrentPlayer).map((player, index) => (
               <div key={player.id} className="player-info-container">
                 <div className="player-info-box">
                   <div className="player-info">
@@ -708,7 +967,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
                   </span>
                   <span className="my-tiles">
                     <img src={cardImage} alt="카드" className="card-icon" />
-                    남은패
+                    <AnimatedRemainingTiles count={showCardDealAnimation ? dealtCards.size : sortedHand.length} />
                   </span>
                 </div>
               </div>
@@ -720,21 +979,37 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
                 <span>현재 조합</span>
               </div>
               <div className="control-buttons">
-                <button className="control-btn" onClick={handleViewCombinations}>
+                <button 
+                  className={`control-btn ${showCardDealAnimation ? 'disabled' : ''}`} 
+                  onClick={showCardDealAnimation ? undefined : handleViewCombinations}
+                  disabled={showCardDealAnimation}
+                >
                   족보보기
                 </button>
-                <button className="control-btn" onClick={handleModeChange}>
-                  {gameMode === 'beginner' ? '초보모드' : '일반모드'}
+                <button 
+                  className={`control-btn ${showCardDealAnimation ? 'disabled' : ''}`} 
+                  onClick={showCardDealAnimation ? undefined : handleModeChange}
+                  disabled={showCardDealAnimation}
+                >
+                  {gameMode === 'easyMode' ? '초보모드' : '일반모드'}
                 </button>
               </div>
             </div>
 
             {/* 우측 - Drop/Pass 버튼 */}
             <div className="action-buttons">
-              <button className="action-btn drop-btn" onClick={handleSubmitCards}>
+              <button 
+                className={`action-btn drop-btn ${showCardDealAnimation ? 'disabled' : ''}`} 
+                onClick={showCardDealAnimation ? undefined : handleSubmitCards}
+                disabled={showCardDealAnimation}
+              >
                 Submit
               </button>
-              <button className="action-btn pass-btn" onClick={handlePass}>
+              <button 
+                className={`action-btn pass-btn ${showCardDealAnimation ? 'disabled' : ''}`} 
+                onClick={showCardDealAnimation ? undefined : handlePass}
+                disabled={showCardDealAnimation}
+              >
                 Pass
               </button>
             </div>
@@ -753,13 +1028,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
                   } : showCardDealAnimation ? {
                     animationDelay: `${index * 0.12}s`
                   } : {}}
-                  onClick={() => handleCardSelect(tile.id)}
+                  onClick={showCardDealAnimation ? undefined : () => handleCardSelect(tile.id)}
                   draggable={!isSorting && !showCardDealAnimation}
-                  onDragStart={(e: React.DragEvent) => handleDragStart(e, tile.id)}
-                  onDragOver={(e: React.DragEvent) => handleDragOver(e, index)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e: React.DragEvent) => handleDrop(e, index)}
-                  onDragEnd={handleDragEnd}
+                  onDragStart={showCardDealAnimation ? undefined : (e: React.DragEvent) => handleDragStart(e, tile.id)}
+                  onDragOver={showCardDealAnimation ? undefined : (e: React.DragEvent) => handleDragOver(e, index)}
+                  onDragLeave={showCardDealAnimation ? undefined : handleDragLeave}
+                  onDrop={showCardDealAnimation ? undefined : (e: React.DragEvent) => handleDrop(e, index)}
+                  onDragEnd={showCardDealAnimation ? undefined : handleDragEnd}
                 >
                   {/* 카드 분배 애니메이션 중에는 뒷면만 표시 */}
                   {showCardDealAnimation && !dealtCards.has(index) ? (
@@ -781,11 +1056,19 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
             </div>
             {/* 정렬 버튼들 */}
             <div className="sort-buttons">
-              <button className="sort-btn" onClick={handleSortByNumber}>
+              <button 
+                className={`sort-btn ${showCardDealAnimation ? 'disabled' : ''}`} 
+                onClick={showCardDealAnimation ? undefined : handleSortByNumber}
+                disabled={showCardDealAnimation}
+              >
                 숫자정렬
               </button>
-              <button className="sort-btn" onClick={handleSortByColor}>
-                모양정렬
+              <button 
+                className={`sort-btn ${showCardDealAnimation ? 'disabled' : ''}`} 
+                onClick={showCardDealAnimation ? undefined : handleSortByColor}
+                disabled={showCardDealAnimation}
+              >
+                색상정렬
               </button>
             </div>
           </div>
@@ -805,6 +1088,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
         isOpen={showCombinationGuide}
         onClose={() => setShowCombinationGuide(false)}
         onShowGameGuide={() => setShowGameGuide(true)}
+        gameMode={gameMode}
       />
       
       {/* 게임 가이드북 모달 */}
