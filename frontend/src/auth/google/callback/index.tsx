@@ -52,7 +52,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
     if (idToken) {
       fetch('https://api.lexionline.minsung.kr/api/auth/google', {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: idToken }),
       })
         .then(async (res) => {
