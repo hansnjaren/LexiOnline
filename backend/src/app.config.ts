@@ -21,7 +21,12 @@ export default config({
 
     // CORS 설정: 프론트엔드 주소에 맞게 origin 변경
     const corsOptions = {
-      origin: "*",
+      origin: [
+        "http://localhost:3000",
+        "https://lexi-online.vercel.app",
+        "https://lexionline.minsung.kr",
+        "https://34.111.207.27"
+      ],
       credentials: true,
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
