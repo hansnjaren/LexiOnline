@@ -19,16 +19,24 @@ export default config({
       next();
     });
 
-    // CORS 설정: 프론트엔드 주소에 맞게 origin 변경하세요
-    app.use(cors({
+    // CORS 설정: 프론트엔드 주소에 맞게 origin 변경
+    const corsOptions = {
       origin: [
-        "http://localhost:3000",  // 프론트엔드 주소(포트 포함)
+        "http://localhost:3000",
         "https://lexi-online.vercel.app",
         "https://lexionline.minsung.kr",
         "https://34.111.207.27"
       ],
-      credentials: true,                 // 쿠키나 인증 헤더 사용 시 true
-    }));
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+    };
+
+    // CORS 미들웨어 최상단 적용 (모든 경로에 적용)
+    app.use(cors(corsOptions));
+
+    // 모든 OPTIONS preflight 요청에 대해 CORS 응답 처리
+    app.options("*", cors(corsOptions));
 
     // JSON 바디 파싱 미들웨어
     app.use(express.json());
