@@ -40,6 +40,7 @@ export default config({
 
     // JSON 바디 파싱 미들웨어
     app.use(express.json());
+    app.use(express.text({ type: 'text/plain' }));
 
     // API 라우터 등록
     app.use('/api', authRouter);
