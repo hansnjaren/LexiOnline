@@ -22,7 +22,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
       return;
     }
 
-    fetch('https://34.111.207.27:443/api/userinfo', {
+    fetch('https://api.lexionline.minsung.kr/api/userinfo', {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(async res => {

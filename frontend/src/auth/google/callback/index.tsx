@@ -50,7 +50,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
     console.log('[OAuthCallback] id_token:', idToken);
 
     if (idToken) {
-      fetch('https://34.111.207.27:443/api/auth/google', {
+      fetch('https://api.lexionline.minsung.kr/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: idToken }),
