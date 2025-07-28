@@ -85,25 +85,6 @@ router.post("/auth/google", async (req: Request, res: Response) => {
   }
 });
 
-// OPTIONS /api/auth/google - CORS preflight 요청 처리
-router.options("/auth/google", (req, res) => {
-  // 허용할 Origin 헤더 설정
-  const allowedOrigins = [
-    "http://localhost:3000",
-    "https://lexi-online.vercel.app",
-    "https://lexionline.minsung.kr",
-    "https://34.111.207.27"
-  ];
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
-  }
-  
-  res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.sendStatus(204);
-});
-
 // GET /api/userinfo
 router.get('/userinfo', async (req: Request, res: Response) => {
   try {
