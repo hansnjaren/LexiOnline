@@ -32,19 +32,7 @@ export default config({
       allowedHeaders: ["Content-Type", "Authorization"],
     };
 
-    // 수동 Preflight 요청 처리
-    app.options('*', (req, res) => {
-      const origin = req.headers.origin;
-      if (corsOptions.origin.includes(origin)) {
-        res.header('Access-Control-Allow-Origin', origin);
-      }
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-      res.header('Access-Control-Allow-Credentials', 'true');
-      res.sendStatus(204); // No Content
-    });
-
-    // CORS 미들웨어 적용
+    // CORS 미들웨어 적용 (이 미들웨어가 Preflight 요청을 자동으로 처리합니다)
     app.use(cors(corsOptions));
 
     // JSON 바디 파싱 미들웨어
