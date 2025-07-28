@@ -10,6 +10,7 @@ import cloudImage from '../../cloud.png';
 import CombinationGuide from './CombinationGuide';
 import GameGuide from './GameGuide';
 import CardDealAnimation from './CardDealAnimation';
+import ColyseusService from '../../services/ColyseusService';
 
 interface GameScreenProps {
   onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result') => void;
@@ -102,6 +103,45 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     }
     return playerArray;
   });
+
+  // Colyseus 연결 초기화
+  useEffect(() => {
+    const room = ColyseusService.getRoom();
+    if (!room) {
+      console.error('방에 연결되지 않았습니다.');
+      onScreenChange('lobby');
+      return;
+    }
+
+    // 게임 상태 구독
+    room.onStateChange((state) => {
+      console.log('게임 상태 변경:', state);
+      // 게임 상태에 따른 UI 업데이트 로직 추가 예정
+    });
+
+    // 게임 메시지 수신
+    room.onMessage('gameEnded', (message) => {
+      console.log('게임 종료:', message);
+      onScreenChange('result');
+    });
+
+    room.onMessage('roundStart', (message) => {
+      console.log('라운드 시작:', message);
+      // 라운드 시작 로직 추가 예정
+    });
+
+    room.onMessage('submitted', (message) => {
+      console.log('카드 제출:', message);
+      // 카드 제출 로직 추가 예정
+    });
+
+    // 방에서 나갈 때 정리
+    return () => {
+      room.onLeave(() => {
+        console.log('게임에서 나갔습니다.');
+      });
+    };
+  }, [onScreenChange]);
 
   // 카드 색상 매핑 (초보모드 ↔ 일반모드)
   const colorMapping = {

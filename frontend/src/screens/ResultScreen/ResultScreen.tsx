@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './ResultScreen.css';
+import ColyseusService from '../../services/ColyseusService';
 
 
 
@@ -177,11 +178,16 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
 
   const handlePlayAgain = () => {
     console.log('다시하기');
+    const room = ColyseusService.getRoom();
+    if (room) {
+      room.send('playAgain', {});
+    }
     onScreenChange('waiting');
   };
 
   const handleBackToLobby = () => {
     console.log('로비로 돌아가기');
+    ColyseusService.disconnect();
     onScreenChange('lobby');
   };
 

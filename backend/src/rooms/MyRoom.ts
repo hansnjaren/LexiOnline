@@ -19,6 +19,9 @@ import {
 export class MyRoom extends Room<MyRoomState> implements IMyRoom {
   maxClients = 5;
   state = new MyRoomState();
+  
+  // 방이 비어있을 때 자동 삭제 시간 (30분)
+  autoDispose = false;
 
   maxNumberMap: Record<number, number> = { 3: 9, 4: 13, 5: 15 };
 
@@ -41,6 +44,61 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     this.onMessage("pass", (client) => handlePass(this, client));
     this.onMessage("ready", (client, data) => handleReady(this, client, data));
     this.onMessage("easyMode", (client, data) => handleEasyMode(this, client, data));
+    
+    // ------------------------------------------------------------------- 프론트엔드 관련 추가
+
+    // 프론트엔드 연결을 위한 추가 메시지 핸들러
+    this.onMessage("setNickname", (client, data) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || !data.nickname) {
+        client.send("nicknameRejected", { reason: "Invalid player or nickname" });
+        return;
+      }
+
+      const nickname = data.nickname.trim();
+      if (nickname.length === 0) {
+        client.send("nicknameRejected", { reason: "Nickname cannot be empty" });
+        return;
+      }
+
+      // 중복 닉네임 체크 (자신의 기존 닉네임은 제외)
+      const existingPlayer = Array.from(this.state.players.values()).find(p => 
+        p.nickname === nickname && p.sessionId !== client.sessionId
+      );
+
+      if (existingPlayer) {
+        client.send("nicknameRejected", { 
+          reason: "Nickname already exists in this room",
+          existingNickname: nickname
+        });
+        return;
+      }
+
+      // 닉네임 설정
+      player.nickname = nickname;
+      this.broadcast("nicknameUpdate", {
+        playerId: client.sessionId,
+        nickname: nickname
+      });
+      
+      console.log(`플레이어 ${client.sessionId}의 닉네임이 "${nickname}"으로 설정됨`);
+    });
+
+    // 재연결 시 기존 닉네임 확인
+    this.onMessage("checkNickname", (client) => {
+      const player = this.state.players.get(client.sessionId);
+      if (player && player.nickname && player.nickname !== '') {
+        console.log(`재연결된 플레이어 ${client.sessionId}의 기존 닉네임: ${player.nickname}`);
+        client.send("nicknameConfirmed", { nickname: player.nickname });
+      }
+    });
+
+    this.onMessage("playAgain", (client) => {
+      this.resetGameState();
+      this.broadcast("gameReset", {});
+    });
+
+    // ------------------------------------------------------------------- 프론트엔드 관련 추가 끝
 
     this.onMessage("start", (client, data) => {
       if (client.sessionId !== this.state.host) {
@@ -66,6 +124,25 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
   }
 
   onJoin(client: Client) {
+
+    // ------------------------------------------------------------------- 프론트엔드 관련 추가
+    // 새로고침 관련 수정 필요
+
+    // 이미 존재하는 플레이어인지 확인
+    const existingPlayer = this.state.players.get(client.sessionId);
+    if (existingPlayer) {
+      console.log(`플레이어 ${client.sessionId}가 이미 존재합니다. 재연결로 처리합니다.`);
+      // 기존 플레이어 정보 유지하고 재연결 알림만 보냄
+      this.broadcast("playerReconnected", {
+        playerId: client.sessionId,
+        nickname: existingPlayer.nickname || '익명',
+        isHost: this.state.host === client.sessionId
+      });
+      return;
+    }
+
+    // ------------------------------------------------------------------- 프론트엔드 관련 추가 끝
+
     const player = new PlayerState();
     player.sessionId = client.sessionId;
     this.state.players.set(client.sessionId, player);
@@ -74,19 +151,43 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     if (this.state.host === "") {
       this.state.host = client.sessionId;
     }
+
+    // ------------------------------------------------------------------- 프론트엔드 관련 추가
+    // 게임 대기 화면에서 플레이어들 정보 불러오기
+
+    // 새 플레이어 입장 알림
+    this.broadcast("playerJoined", {
+      playerId: client.sessionId,
+      nickname: player.nickname || '익명',
+      isHost: this.state.host === client.sessionId
+    });
+
+    console.log(`플레이어 ${client.sessionId} 입장. 현재 플레이어 수: ${this.state.players.size}`);
   }
 
   onLeave(client: Client, consented: boolean) {
+    const wasHost = client.sessionId === this.state.host;
+    
     this.state.players.delete(client.sessionId);
 
     const idx = this.state.playerOrder.indexOf(client.sessionId);
     if (idx !== -1) this.state.playerOrder.splice(idx, 1);
 
-    if (client.sessionId === this.state.host) {
+    if (wasHost) {
       const next = this.state.players.keys().next().value;
       this.state.host = next ? next : "";
     }
+
+    // 플레이어 퇴장 알림
+    this.broadcast("playerLeft", {
+      playerId: client.sessionId,
+      newHost: wasHost ? this.state.host : null
+    });
+
+    console.log(`플레이어 ${client.sessionId} 퇴장. 현재 플레이어 수: ${this.state.players.size}`);
   }
+
+  // ------------------------------------------------------------------- 프론트엔드 관련 추가 끝
 
   onDispose() {
     console.log("room", this.roomId, "disposing...");

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { JSX } from 'react';
+import '../../../screens/LobbyScreen/LobbyScreen.css';
 
 export default function GoogleOAuthCallback(): JSX.Element {
   const navigate = useNavigate();
@@ -80,7 +81,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
         });
     } else {
       console.error('[OAuthCallback] id_token이 없음');
-      alert('id_token이 없습니다. 로그인에 실패했습니다.');
+      alert('로그인에 실패했습니다.');
       // 해시 제거도 단 한 번만
       window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
       console.log('[OAuthCallback] URL 해시 제거 완료');
@@ -89,5 +90,20 @@ export default function GoogleOAuthCallback(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <div>인증 처리 중...</div>;
+  return (
+    <div className="lobby-screen">
+      <div className="loading-container">
+        <div className="loading-spinner-large"></div>
+        <p style={{ 
+          margin: 0, 
+          opacity: 0.8, 
+          fontSize: '1.2vw', 
+          fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+          fontWeight: '400'
+        }}>
+          인증 처리 중...
+        </p>
+      </div>
+    </div>
+  );
 }

@@ -10,81 +10,89 @@
 
 .waiting-container {
   background: rgba(26, 26, 26, 0.95);
-  padding: 40px;
-  border-radius: 20px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-  min-width: 500px;
-  max-width: 600px;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 3vw;
+  border-radius: 1.5vw;
+  box-shadow: 0 1.5vw 3vw rgba(0, 0, 0, 0.5);
+  min-width: 45vw;
+  max-width: 55vw;
+  backdrop-filter: blur(0.8vw);
+  border: 0.08vw solid rgba(255, 255, 255, 0.15);
 }
 
 .header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 2.5vw;
 }
 
 .header h1 {
   color: #ffffff;
-  margin-bottom: 15px;
+  margin-bottom: 1.2vw;
+  font-size: clamp(1.5vw, 4vw, 2.5vw);
+  transition: font-size 0.3s ease;
 }
 
 .room-info {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 10px;
-  font-size: 18px;
+  gap: 0.8vw;
+  font-size: clamp(1vw, 2.5vw, 1.5vw);
   color: #cccccc;
+  transition: font-size 0.3s ease;
 }
 
 .copy-btn {
-  padding: 5px 10px;
+  padding: 0.4vw 0.8vw;
   background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
   color: #000000;
   border: none;
-  border-radius: 6px;
+  border-radius: 0.5vw;
   cursor: pointer;
-  font-size: 12px;
-  box-shadow: 0 2px 6px rgba(255, 255, 255, 0.2);
+  font-size: 1vw;
+  box-shadow: 0 0.15vw 0.5vw rgba(255, 255, 255, 0.2);
 }
 
 .players-section {
-  margin-bottom: 30px;
+  margin-bottom: 2.5vw;
 }
 
 .players-section h2 {
   color: #ffffff;
-  margin-bottom: 15px;
+  margin-bottom: 1.2vw;
   text-align: center;
+  font-size: clamp(1.2vw, 3vw, 1.8vw);
+  transition: font-size 0.3s ease;
 }
 
 .players-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0.8vw;
 }
 
 .player-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px;
+  padding: 1vw;
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.6vw;
+  border: 0.08vw solid rgba(255, 255, 255, 0.2);
 }
 
 .nickname {
   font-weight: bold;
   color: #ffffff;
+  font-size: clamp(0.8vw, 2.5vw, 1.2vw);
+  transition: font-size 0.3s ease;
 }
 
 .status {
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
+  padding: 0.3vw 0.6vw;
+  border-radius: 0.3vw;
+  font-size: clamp(0.7vw, 2vw, 1vw);
   font-weight: bold;
+  transition: font-size 0.3s ease;
 }
 
 .status.ready {
@@ -99,37 +107,39 @@
 
 .game-settings {
   text-align: center;
-  margin-top: 15px;
-  margin-bottom: 15px;
-  padding: 20px;
-  padding-bottom: 50px;
+  margin-top: 1.2vw;
+  margin-bottom: 1.2vw;
+  padding: 1.5vw;
+  padding-bottom: 4vw;
   background-color: #f8f9fa;
-  border-radius: 8px;
+  border-radius: 0.6vw;
 }
 
 .game-settings h2 {
   color: #333;
-  margin-bottom: 15px;
+  margin-bottom: 1.2vw;
+  font-size: 1.6vw;
+  transition: font-size 0.3s ease;
 }
 
 .rounds-setting {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 15px;
+  gap: 1.2vw;
 }
 
 .rounds-setting label {
   font-weight: bold;
   color: #333;
-  font-size: 16px;
+  font-size: 1.3vw;
 }
 
 .rounds-setting select {
-  padding: 8px 12px;
-  border: 2px solid #ddd;
-  border-radius: 6px;
-  font-size: 16px;
+  padding: 0.6vw 1vw;
+  border: 0.15vw solid #ddd;
+  border-radius: 0.5vw;
+  font-size: 1.3vw;
   background-color: white;
   cursor: pointer;
 }
@@ -140,24 +150,24 @@
 }
 
 .player-count-setting {
-  margin-top: 15px;
+  margin-top: 1.2vw;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 15px;
+  gap: 1.2vw;
 }
 
 .player-count-setting label {
   font-weight: bold;
   color: #333;
-  font-size: 16px;
+  font-size: 1.3vw;
 }
 
 .player-count-setting select {
-  padding: 8px 12px;
-  border: 2px solid #ddd;
-  border-radius: 6px;
-  font-size: 16px;
+  padding: 0.6vw 1vw;
+  border: 0.15vw solid #ddd;
+  border-radius: 0.5vw;
+  font-size: 1.3vw;
   background-color: white;
   cursor: pointer;
 }
@@ -170,14 +180,14 @@
 .controls {
   display: flex;
   justify-content: center;
-  gap: 15px;
+  gap: 1.2vw;
 }
 
 .btn {
-  padding: 12px 24px;
+  padding: 1vw 2vw;
   border: none;
-  border-radius: 6px;
-  font-size: 16px;
+  border-radius: 0.5vw;
+  font-size: clamp(0.9vw, 2.5vw, 1.3vw);
   font-weight: bold;
   cursor: pointer;
   transition: all 0.3s;
@@ -193,10 +203,95 @@
 }
 
 .btn-start {
-  background-color: #dc3545;
+  background-color: #28a745;
   color: white;
 }
 
 .btn-start:hover {
-  background-color: #c82333;
+  background-color: #218838;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .waiting-container {
+    min-width: 90vw;
+    max-width: 95vw;
+    padding: 4vw;
+  }
+  
+  .header h1 {
+    font-size: clamp(2vw, 5vw, 3vw);
+  }
+  
+  .nickname {
+    font-size: clamp(1vw, 3vw, 1.5vw);
+  }
+  
+  .status {
+    font-size: clamp(0.8vw, 2.5vw, 1.2vw);
+  }
+  
+  .btn {
+    font-size: clamp(1.2vw, 3vw, 1.6vw);
+    padding: 1.2vw 2.5vw;
+  }
+}
+
+@media (max-width: 480px) {
+  .waiting-container {
+    min-width: 95vw;
+    max-width: 98vw;
+    padding: 5vw;
+  }
+  
+  .header h1 {
+    font-size: clamp(2.5vw, 6vw, 3.5vw);
+  }
+  
+  .nickname {
+    font-size: clamp(1.2vw, 4vw, 1.8vw);
+  }
+  
+  .status {
+    font-size: clamp(1vw, 3vw, 1.4vw);
+  }
+  
+  .btn {
+    font-size: clamp(1.5vw, 4vw, 2vw);
+    padding: 1.5vw 3vw;
+  }
+}
+
+/* 로딩 컨테이너 스타일 */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: white;
+  font-size: 1.5vw;
+  font-weight: 500;
+}
+
+.loading-container p {
+  margin: 0;
+  opacity: 0.8;
+  font-size: clamp(1vw, 2.5vw, 1.5vw);
+}
+
+.loading-spinner-large {
+  width: 4vw;
+  height: 4vw;
+  border: 0.3vw solid rgba(255, 255, 255, 0.3);
+  border-top: 0.3vw solid #4CAF50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  display: block;
+  margin: 0 auto 2vw auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 } 

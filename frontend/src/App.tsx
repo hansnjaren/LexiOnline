@@ -18,16 +18,30 @@ function AppContent() {
   // URL 경로에 따라 화면 상태 설정
   useEffect(() => {
     const path = location.pathname;
+    
+    // 저장된 방 정보 확인
+    const savedRoomInfo = sessionStorage.getItem('room_info');
+    
     if (path === '/waiting') {
       setCurrentScreen('waiting');
     } else if (path === '/game') {
       setCurrentScreen('game');
     } else if (path === '/result') {
       setCurrentScreen('result');
+    } else if (savedRoomInfo && path === '/') {
+      // 저장된 방 정보가 있고 루트 경로인 경우 대기실로 이동
+      console.log('저장된 방 정보 발견. 대기실로 이동합니다.');
+      setCurrentScreen('waiting');
+      navigate('/waiting');
     } else {
+      // 저장된 방 정보가 없거나 다른 경로인 경우 로비로 이동
+      if (savedRoomInfo && path !== '/') {
+        console.log('저장된 방 정보가 있지만 다른 경로입니다. 방 정보를 삭제합니다.');
+        sessionStorage.removeItem('room_info');
+      }
       setCurrentScreen('lobby');
     }
-  }, [location.pathname]);
+  }, [location.pathname, navigate]);
 
   const handleScreenChange = (screen: ScreenType) => {
     setCurrentScreen(screen);
