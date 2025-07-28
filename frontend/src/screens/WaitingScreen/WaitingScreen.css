@@ -211,6 +211,15 @@
   background-color: #218838;
 }
 
+.btn-leave {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-leave:hover {
+  background-color: #c82333;
+}
+
 /* 반응형 디자인 */
 @media (max-width: 768px) {
   .waiting-container {

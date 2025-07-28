@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './WaitingScreen.css';
 import ColyseusService from '../../services/ColyseusService';
+import Toast from '../../components/Toast/Toast';
 
 interface Player {
   id: string;
@@ -23,6 +24,8 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
   const [isReady, setIsReady] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
     // URL을 /waiting으로 설정
@@ -255,7 +258,8 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
 
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomCode);
-    alert('방 코드가 복사되었습니다!');
+    setToastMessage('방 코드가 복사되었습니다!');
+    setShowToast(true);
   };
 
   const allPlayersReady = players.length > 0 && players.every(player => player.isReady);
@@ -274,6 +278,15 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
 
   return (
     <div className="waiting-screen">
+      <Toast 
+        message={toastMessage} 
+        type="success"
+        isVisible={showToast} 
+        onClose={() => setShowToast(false)} 
+        showCloseButton={false}
+        hideBorder={true}
+        isCopyNotification={true}
+      />
       <div className="waiting-container">
         <div className="header">
           <h1>게임 대기실</h1>

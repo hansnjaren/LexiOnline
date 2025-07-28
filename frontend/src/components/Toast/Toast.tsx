@@ -8,6 +8,8 @@ interface ToastProps {
   onClose: () => void;
   duration?: number;
   showCloseButton?: boolean;
+  hideBorder?: boolean;
+  isCopyNotification?: boolean;
 }
 
 const Toast: React.FC<ToastProps> = ({ 
@@ -16,7 +18,9 @@ const Toast: React.FC<ToastProps> = ({
   isVisible, 
   onClose, 
   duration = 2000,
-  showCloseButton = true
+  showCloseButton = true,
+  hideBorder = false,
+  isCopyNotification = false
 }) => {
   useEffect(() => {
     if (isVisible) {
@@ -31,7 +35,7 @@ const Toast: React.FC<ToastProps> = ({
   if (!isVisible) return null;
 
   return (
-    <div className={`toast toast-${type} ${isVisible ? 'show' : ''}`}>
+    <div className={`toast toast-${type} ${isVisible ? 'show' : ''} ${hideBorder ? 'no-border' : ''} ${isCopyNotification ? 'copy-notification' : ''}`}>
       <div className="toast-content">
         <span className="toast-icon">
           {type === 'success' && '✅'}
