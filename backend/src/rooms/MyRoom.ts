@@ -169,12 +169,17 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     console.log(`[MyRoom] Player ${client.sessionId} disconnected. Consented: ${consented}`);
     player.connected = false;
 
-    this.clock.setTimeout(() => {
-      if (!player.connected) {
-        console.log(`[MyRoom] Cleaning up disconnected player ${player.sessionId}`);
-        this.removePlayer(player.sessionId);
-      }
-    }, 20000);
+    if (consented) {
+      console.log(`[MyRoom] Player ${player.sessionId} left intentionally. Cleaning up immediately.`);
+      this.removePlayer(player.sessionId);
+    } else {
+      this.clock.setTimeout(() => {
+        if (!player.connected) {
+          console.log(`[MyRoom] Cleaning up disconnected player ${player.sessionId}`);
+          this.removePlayer(player.sessionId);
+        }
+      }, 20000);
+    }
   }
 
   removePlayer(sessionId: string) {
