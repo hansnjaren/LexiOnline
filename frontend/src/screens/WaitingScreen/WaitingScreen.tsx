@@ -131,19 +131,34 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
       onScreenChange('game');
     });
 
+    room.onMessage('roundStart', (message: any) => {
+      console.log('WaitingScreen에서 roundStart 메시지 수신:', message);
+      // GameScreen으로 전환하면서 메시지 전달
+      onScreenChange('game');
+    });
+
+    room.onMessage('roundStarted', (message: any) => {
+      console.log('WaitingScreen에서 roundStarted 메시지 수신:', message);
+      // GameScreen으로 전환하면서 메시지 전달
+      onScreenChange('game');
+    });
+
     room.onMessage('readyUpdate', (message: any) => {
-      console.log('준비 상태 업데이트:', message);
+      console.log('readyUpdate 메시지 수신:', message);
       // 준비 상태 업데이트 시 플레이어 목록도 업데이트
-      setPlayers(prevPlayers => 
-        prevPlayers.map(player => 
+      setPlayers(prevPlayers => {
+        const updatedPlayers = prevPlayers.map(player => 
           player.id === message.playerId 
             ? { ...player, isReady: message.ready }
             : player
-        )
-      );
+        );
+        console.log('플레이어 목록 업데이트됨:', updatedPlayers);
+        return updatedPlayers;
+      });
       
       // 자신의 준비 상태도 업데이트
       if (message.playerId === room.sessionId) {
+        console.log('자신의 준비 상태 업데이트:', message.ready);
         setIsReady(message.ready);
       }
     });
@@ -237,6 +252,7 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
     const room = ColyseusService.getRoom();
     if (room) {
       const newReadyState = !isReady;
+      console.log('준비 버튼 클릭:', newReadyState);
       setIsReady(newReadyState);
       room.send('ready', { ready: newReadyState });
     }

@@ -123,11 +123,16 @@ export function handlePass(room: IMyRoom, client: Client) {
 
 // ready 상태 변경 처리
 export function handleReady(room: IMyRoom, client: Client, data: any) {
+  console.log('handleReady 호출됨:', client.sessionId, data);
   const player = room.state.players.get(client.sessionId);
-  if (!player) return;
+  if (!player) {
+    console.log('플레이어를 찾을 수 없음:', client.sessionId);
+    return;
+  }
 
   if (typeof data.ready === "boolean") {
     player.ready = data.ready;
+    console.log('플레이어 준비 상태 변경:', client.sessionId, data.ready);
   } else {
     // 토글 방식 (필요 시 주석 해제)
     // player.ready = !player.ready;
@@ -137,6 +142,7 @@ export function handleReady(room: IMyRoom, client: Client, data: any) {
     playerId: client.sessionId,
     ready: player.ready,
   });
+  console.log('readyUpdate 메시지 broadcast됨');
 }
 
 // easyMode 상태 변경 처리
