@@ -12,18 +12,7 @@ const JWT_SECRET = process.env.JWT_SECRET; // 실제 환경변수로 설정하�
 // POST /api/auth/google
 router.post("/auth/google", async (req: Request, res: Response) => {
   console.log("✅ [POST] /api/auth/google 진입");
-  
-  let token;
-  if (typeof req.body === 'string') {
-    try {
-      const parsedBody = JSON.parse(req.body);
-      token = parsedBody.token;
-    } catch (e) {
-      return res.status(400).json({ error: "Invalid JSON format in request body" });
-    }
-  } else {
-    token = req.body.token;
-  }
+  const { token } = req.body; // 프론트에서 넘긴 구글 id_token
 
   if (!token) {
     return res.status(400).json({ error: "Token is required" });

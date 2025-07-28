@@ -21,12 +21,7 @@ export default config({
 
     // CORS 설정: 프론트엔드 주소에 맞게 origin 변경
     const corsOptions = {
-      origin: [
-        "http://localhost:3000",
-        "https://lexi-online.vercel.app",
-        "https://lexionline.minsung.kr",
-        "https://34.111.207.27"
-      ],
+      origin: "*",
       credentials: true,
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
@@ -40,7 +35,6 @@ export default config({
 
     // JSON 바디 파싱 미들웨어
     app.use(express.json());
-    app.use(express.text({ type: 'text/plain' }));
 
     // API 라우터 등록
     app.use('/api', authRouter);
