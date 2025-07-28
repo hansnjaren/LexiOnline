@@ -22,7 +22,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
       return;
     }
 
-    fetch('/api/userinfo', {
+    fetch('http://34.47.120.134:2567/api/userinfo', {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(async res => {
