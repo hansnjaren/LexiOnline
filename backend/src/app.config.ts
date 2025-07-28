@@ -23,7 +23,8 @@ export default config({
     app.use(cors({
       origin: [
         "http://localhost:3000",  // 프론트엔드 주소(포트 포함)
-        "https://lexi-online.vercel.app/"
+        "https://lexi-online.vercel.app/",
+        "https://34.111.207.27"
       ],
       credentials: true,                 // 쿠키나 인증 헤더 사용 시 true
     }));
