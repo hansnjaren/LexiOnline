@@ -15,7 +15,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
   const navigate = useNavigate();
   const [nickname, setNickname] = useState('');
   const [roomCode, setRoomCode] = useState('');
-  const [token, setToken] = useState<string | null>(() => sessionStorage.getItem('access_token'));
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('access_token'));
   const [user, setUser] = useState<User | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,7 +53,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
         setUser(data.user);
         if (data.user.nickname) {
           setNickname(data.user.nickname);
-          sessionStorage.setItem('current_nickname', data.user.nickname);
+          localStorage.setItem('current_nickname', data.user.nickname);
         }
         setIsLoading(false);
       })
@@ -61,7 +61,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
         console.error(err);
         setUser(null);
         setToken(null);
-        sessionStorage.removeItem('access_token');
+        localStorage.removeItem('access_token');
         setIsLoading(false);
       });
   }, [token]);
@@ -145,8 +145,8 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
   const handleLogin = () => {
     const state = Math.random().toString(36).substring(2);
     const nonce = Math.random().toString(36).substring(2);
-    sessionStorage.setItem('oauth_state', state);
-    sessionStorage.setItem('oauth_nonce', nonce);
+    localStorage.setItem('oauth_state', state);
+    localStorage.setItem('oauth_nonce', nonce);
 
     const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID!;
     const redirectUri = process.env.REACT_APP_GOOGLE_REDIRECT_URI!;
@@ -163,7 +163,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('access_token');
+    localStorage.removeItem('access_token');
     setToken(null);
     setUser(null);
     setNickname('');

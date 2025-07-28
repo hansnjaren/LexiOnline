@@ -20,7 +20,7 @@ function AppContent() {
     const path = location.pathname;
     
     // 저장된 방 정보 확인
-    const savedRoomInfo = sessionStorage.getItem('room_info');
+    const savedRoomInfo = localStorage.getItem('room_info');
     
     if (path === '/waiting') {
       setCurrentScreen('waiting');
@@ -37,7 +37,7 @@ function AppContent() {
       // 저장된 방 정보가 없거나 다른 경로인 경우 로비로 이동
       if (savedRoomInfo && path !== '/') {
         console.log('저장된 방 정보가 있지만 다른 경로입니다. 방 정보를 삭제합니다.');
-        sessionStorage.removeItem('room_info');
+        localStorage.removeItem('room_info');
       }
       setCurrentScreen('lobby');
     }

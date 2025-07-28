@@ -20,7 +20,6 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
   maxClients = 5;
   state = new MyRoomState();
   
-  // 방이 비어있을 때 자동 삭제 시간 (30분)
   autoDispose = false;
 
   maxNumberMap: Record<number, number> = { 3: 9, 4: 13, 5: 15 };
@@ -39,33 +38,25 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       }
     });
 
-    // 메시지 핸들러 분리한 함수 사용
     this.onMessage("submit", (client, data) => handleSubmit(this, client, data));
     this.onMessage("pass", (client) => handlePass(this, client));
     this.onMessage("ready", (client, data) => handleReady(this, client, data));
     this.onMessage("easyMode", (client, data) => handleEasyMode(this, client, data));
     
-    // ------------------------------------------------------------------- 프론트엔드 관련 추가
-
-    // 프론트엔드 연결을 위한 추가 메시지 핸들러
     this.onMessage("setNickname", (client, data) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || !data.nickname) {
         client.send("nicknameRejected", { reason: "Invalid player or nickname" });
         return;
       }
-
       const nickname = data.nickname.trim();
       if (nickname.length === 0) {
         client.send("nicknameRejected", { reason: "Nickname cannot be empty" });
         return;
       }
-
-      // 중복 닉네임 체크 (자신의 기존 닉네임은 제외)
       const existingPlayer = Array.from(this.state.players.values()).find(p => 
         p.nickname === nickname && p.sessionId !== client.sessionId
       );
-
       if (existingPlayer) {
         client.send("nicknameRejected", { 
           reason: "Nickname already exists in this room",
@@ -73,22 +64,16 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
         });
         return;
       }
-
-      // 닉네임 설정
       player.nickname = nickname;
       this.broadcast("nicknameUpdate", {
         playerId: client.sessionId,
         nickname: nickname
       });
-      
-      console.log(`플레이어 ${client.sessionId}의 닉네임이 "${nickname}"으로 설정됨`);
     });
 
-    // 재연결 시 기존 닉네임 확인
     this.onMessage("checkNickname", (client) => {
       const player = this.state.players.get(client.sessionId);
       if (player && player.nickname && player.nickname !== '') {
-        console.log(`재연결된 플레이어 ${client.sessionId}의 기존 닉네임: ${player.nickname}`);
         client.send("nicknameConfirmed", { nickname: player.nickname });
       }
     });
@@ -98,53 +83,76 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       this.broadcast("gameReset", {});
     });
 
-    // ------------------------------------------------------------------- 프론트엔드 관련 추가 끝
-
     this.onMessage("start", (client, data) => {
       if (client.sessionId !== this.state.host) {
         client.send("startRejected", { reason: "Only the host can start the game." });
         return;
       }
-
       if (this.state.players.size < 3) {
         client.send("startRejected", { reason: "Not enough players." });
         return;
       }
-
       for(const [sessionId, player] of this.state.players){
         if(!player.ready){
           client.send("startRejected", { reason: "There exists some players who are not ready. " });
         }
       }
-
       this.startGame();
       this.startRound();
       this.broadcast("gameStarted", { totalRounds: this.state.totalRounds, easyMode: this.state.easyMode });
     });
   }
 
-  onJoin(client: Client) {
+  onJoin(client: Client, options: { guestId?: string }) {
+    // 재연결 처리
+    if (options.guestId) {
+      const oldPlayer = Array.from(this.state.players.values()).find(p => p.guestId === options.guestId);
+      if (oldPlayer) {
+        console.log(`[MyRoom] Reconnecting player. GuestId: ${options.guestId}`);
+        
+        // 데이터 이전을 위한 새 플레이어 객체 생성
+        const newPlayer = new PlayerState();
+        newPlayer.sessionId = client.sessionId;
+        newPlayer.guestId = oldPlayer.guestId;
+        newPlayer.nickname = oldPlayer.nickname;
+        newPlayer.score = oldPlayer.score;
+        newPlayer.ready = oldPlayer.ready;
+        newPlayer.easyMode = oldPlayer.easyMode;
+        newPlayer.hand = new ArraySchema<number>(...oldPlayer.hand);
 
-    // ------------------------------------------------------------------- 프론트엔드 관련 추가
-    // 새로고침 관련 수정 필요
+        this.state.players.set(client.sessionId, newPlayer);
 
-    // 이미 존재하는 플레이어인지 확인
-    const existingPlayer = this.state.players.get(client.sessionId);
-    if (existingPlayer) {
-      console.log(`플레이어 ${client.sessionId}가 이미 존재합니다. 재연결로 처리합니다.`);
-      // 기존 플레이어 정보 유지하고 재연결 알림만 보냄
-      this.broadcast("playerReconnected", {
-        playerId: client.sessionId,
-        nickname: existingPlayer.nickname || '익명',
-        isHost: this.state.host === client.sessionId
-      });
-      return;
+        // playerOrder 업데이트
+        const orderIndex = this.state.playerOrder.indexOf(oldPlayer.sessionId);
+        if (orderIndex !== -1) {
+          this.state.playerOrder[orderIndex] = client.sessionId;
+        } else {
+          this.state.playerOrder.unshift(client.sessionId);
+        }
+
+        // 호스트 정보 갱신
+        if (this.state.host === oldPlayer.sessionId) {
+          this.state.host = client.sessionId;
+        }
+
+        // 이전 플레이어(유령) 즉시 제거
+        this.state.players.delete(oldPlayer.sessionId);
+        
+        this.broadcast("playerReconnected", {
+          playerId: client.sessionId,
+          nickname: newPlayer.nickname || '익명',
+          isHost: this.state.host === client.sessionId
+        }, { except: client });
+        return;
+      }
     }
 
-    // ------------------------------------------------------------------- 프론트엔드 관련 추가 끝
-
+    // 새로운 플레이어 처리
+    console.log(`[MyRoom] New player joining. GuestId: ${options.guestId}`);
     const player = new PlayerState();
     player.sessionId = client.sessionId;
+    player.guestId = options.guestId || "";
+
     this.state.players.set(client.sessionId, player);
     this.state.playerOrder.unshift(client.sessionId);
 
@@ -152,115 +160,93 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       this.state.host = client.sessionId;
     }
 
-    // ------------------------------------------------------------------- 프론트엔드 관련 추가
-    // 게임 대기 화면에서 플레이어들 정보 불러오기
-
-    // 새 플레이어 입장 알림
     this.broadcast("playerJoined", {
       playerId: client.sessionId,
       nickname: player.nickname || '익명',
       isHost: this.state.host === client.sessionId
     });
-
-    console.log(`플레이어 ${client.sessionId} 입장. 현재 플레이어 수: ${this.state.players.size}`);
   }
 
   onLeave(client: Client, consented: boolean) {
-    const wasHost = client.sessionId === this.state.host;
+    console.log(`[MyRoom] onLeave called for client: ${client.sessionId}. Consented: ${consented}`);
     
-    this.state.players.delete(client.sessionId);
+    // 의도적으로 나간 경우 즉시 제거
+    if (consented) {
+      this.removePlayer(client.sessionId);
+      return;
+    }
 
-    const idx = this.state.playerOrder.indexOf(client.sessionId);
+    // 새로고침 등 비정상적인 종료의 경우, onJoin이 먼저 처리될 수 있도록 잠시 대기
+    this.clock.setTimeout(() => {
+      const player = this.state.players.get(client.sessionId);
+      if (player) {
+        console.log(`[MyRoom] Player ${client.sessionId} did not reconnect in time. Removing.`);
+        this.removePlayer(client.sessionId);
+      }
+    }, 1000); // 1초의 유예 시간
+  }
+
+  removePlayer(sessionId: string) {
+    console.log(`[MyRoom] removePlayer called for sessionId: ${sessionId}`);
+    const wasHost = sessionId === this.state.host;
+    this.state.players.delete(sessionId);
+    const idx = this.state.playerOrder.indexOf(sessionId);
     if (idx !== -1) this.state.playerOrder.splice(idx, 1);
-
     if (wasHost) {
       const next = this.state.players.keys().next().value;
       this.state.host = next ? next : "";
     }
-
-    // 플레이어 퇴장 알림
     this.broadcast("playerLeft", {
-      playerId: client.sessionId,
+      playerId: sessionId,
       newHost: wasHost ? this.state.host : null
     });
-
-    console.log(`플레이어 ${client.sessionId} 퇴장. 현재 플레이어 수: ${this.state.players.size}`);
+    console.log(`[MyRoom] removePlayer: Player removed. Total players: ${this.state.players.size}`);
   }
-
-  // ------------------------------------------------------------------- 프론트엔드 관련 추가 끝
 
   onDispose() {
     console.log("room", this.roomId, "disposing...");
   }
 
   startGame() {
-    // easyMode 설정: 플레이어 가운데 하나라도 easyMode true면 활성화
     this.state.easyMode = [...this.state.players.values()].some(p => p.easyMode);
     this.state.maxNumber = this.maxNumberMap[this.state.players.size] ?? 15;
-
-    // 초기화 작업 예: 턴순, 라운드 등
     this.state.round = 1;
   }
 
   startRound() {
     const maxNumber = this.state.maxNumber;
     const playerCount = this.state.players.size;
-
-    // playerOrder가 이미 입장 역순으로 관리되고 있다고 가정
     const order = this.state.playerOrder;
-
-    // 1) 덱 생성 및 셔플
     const deck = createShuffledDeck(maxNumber);
-
-    // 2) 카드 분배
     const hands = dealCards(deck, playerCount);
-
-    // 3) 분배된 카드를 playerOrder 기준으로 할당
     order.forEach((sessionId, i) => {
       const player = this.state.players.get(sessionId);
       if (player) {
         player.hand = new ArraySchema<number>(...hands[i]);
       }
     });
-
-    // 4) 구름 3 가진 플레이어 찾기 (playerOrder 기준)
     const cloud3PlayerId = findPlayerWithCloud3(this.state.players, maxNumber);
-
     if (cloud3PlayerId === null) {
-      console.error("[BUG] 구름3이 분배되지 않음! 코드 버그 점검 필요");
-      this.broadcast("debugError", { reason: "구름 3 분배 누락" });
       throw new Error("구름 3 분배 누락 - 코드 버그!");
     }
-
-    // 5) 그 플레이어 인덱스 추출
     const cloud3Index = cloud3PlayerId !== null ? order.indexOf(cloud3PlayerId) : 0;
-
     this.state.nowPlayerIndex = cloud3Index;
-
-    // 6) 기타 상태 초기화
     this.state.lastType = 0;
     this.state.lastMadeType = MADE_NONE;
     this.state.lastHighestValue = 0;
     this.state.lastCards = new ArraySchema<number>();
     this.state.lastPlayerIndex = -1;
-
-    // 7) 카드 분배 후 각 플레이어마다 자신의 상태 보내기
     for (const sessionId of this.state.playerOrder) {
       const player = this.state.players.get(sessionId);
       if (!player) continue;
-
       const client = this.clients.find(c => c.sessionId === sessionId);
       if (!client) continue;
-
       client.send("roundStart", {
-        hand: player.hand.slice(),  // ArraySchema -> 일반 배열로 변환
+        hand: player.hand.slice(),
         score: player.score,
         nickname: player.nickname,
-        // 기타 필요한 정보
       });
     }
-
-    // 8) 라운드 시작 알림
     this.broadcast("roundStarted", {
       playerOrder: this.state.playerOrder.slice(),
       round: this.state.round,
@@ -276,7 +262,6 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       this.state.lastCards = new ArraySchema<number>();
       this.broadcast("cycleEnded", {});
     }
-    // 턴 변경 시 추가 액션 처리 가능
   }
 
   endRound() {
@@ -284,16 +269,12 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       const scoreMatrix = calculateRoundScoreMatrix(this.state.players, this.state.maxNumber);
       this.broadcast("scoreMatrixUpdate", { scoreMatrix });
     }
-
     const scoreDiffMap = calculateRoundScores(this.state.players, this.state.maxNumber);
-
     for (const [sessionId, diffScore] of scoreDiffMap.entries()) {
       const player = this.state.players.get(sessionId);
       if (!player) continue;
-      player.score += diffScore; // 기존 점수에 차이만큼 가감
+      player.score += diffScore;
     }
-
-  // 변경된 점수 등을 클라이언트에 알림 원하면 broadcast 추가
     this.broadcast("scoreUpdate", {
       scores: Array.from(this.state.players.entries()).map(([id, p]) => ({
         playerId: id,
@@ -301,30 +282,22 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       })),
       round: this.state.round,
     });
-    // 라운드 진행, 전체 라운드 종료 시 게임 종료
     this.state.round += 1;
     if(this.state.round > this.state.totalRounds) this.endGame();
     else this.startRound();
   }
 
   endGame() {
-    // 1) 최종 점수 수집
     const finalScores = Array.from(this.state.players.entries()).map(([sessionId, player]) => ({
       playerId: sessionId,
       score: player.score,
       nickname: player.nickname,
     }));
-
-    // 2) 최종 점수 클라이언트에 방송
     this.broadcast("gameEnded", { finalScores });
-
-    // 3) 게임 상태 초기화 또는 대기 상태로 전환
     this.resetGameState();
   }
 
-
   resetGameState() {
-    // 라운드, 점수, 각종 상태 초기화
     this.state.round = 0;
     this.state.lastType = 0;
     this.state.lastMadeType = MADE_NONE;
@@ -332,21 +305,11 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     this.state.lastCards = new ArraySchema<number>();
     this.state.lastPlayerIndex = -1;
     this.state.nowPlayerIndex = 0;
-
-    // 플레이어 점수 초기화 (원하면)
     for (const player of this.state.players.values()) {
       player.score = 0;
-      player.hand = new ArraySchema<number>(); // 손패 초기화
-      player.ready = false; // 준비 상태 초기화 (필요시)
+      player.hand = new ArraySchema<number>();
+      player.ready = false;
     }
-
-    // playerOrder 자체는 유지하되, 필요하면 초기화 가능
-    // this.state.playerOrder.clear(); // 또는 유지
-
-    // host 등 기타 상태 유지
-
-    // 클라이언트에게 게임 초기 상태 알림 (옵션)
     this.broadcast("gameReset", {});
   }
-
 }

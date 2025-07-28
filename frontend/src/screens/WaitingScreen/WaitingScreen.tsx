@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Room } from 'colyseus.js';
 import { useNavigate } from 'react-router-dom';
 import './WaitingScreen.css';
 import ColyseusService from '../../services/ColyseusService';
@@ -18,34 +19,33 @@ interface WaitingScreenProps {
 
 const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCount, setPlayerCount }) => {
   const navigate = useNavigate();
+  const roomRef = useRef<Room | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [roomCode, setRoomCode] = useState('');
+  const [hostId, setHostId] = useState('');
   const [rounds, setRounds] = useState(3);
   const [isReady, setIsReady] = useState(false);
-  const [isHost, setIsHost] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
-    // URL을 /waiting으로 설정
-    if (window.location.pathname !== '/waiting') {
-      navigate('/waiting');
-    }
-
+    console.log(`[WaitingScreen] useEffect triggered. Current time: ${new Date().toLocaleTimeString()}`);
     let room = ColyseusService.getRoom();
+    roomRef.current = room;
     
     // 방에 연결되지 않은 경우, 저장된 방 정보로 재연결 시도
     if (!room) {
-      console.log('방에 연결되지 않음. 저장된 방 정보로 재연결 시도...');
+      console.log(`[WaitingScreen] No room instance found. Attempting to reconnect...`);
       setIsReconnecting(true);
       ColyseusService.reconnectToSavedRoom().then(reconnectedRoom => {
         setIsReconnecting(false);
         if (reconnectedRoom) {
-          console.log('저장된 방에 재연결 성공');
+          roomRef.current = reconnectedRoom;
+          console.log(`[WaitingScreen] Reconnection successful. Room ID: ${reconnectedRoom.roomId}`);
           setupRoomListeners(reconnectedRoom);
         } else {
-          console.log('저장된 방이 이미 닫혔거나 존재하지 않습니다. 로비로 이동합니다.');
+          console.log(`[WaitingScreen] Reconnection failed. Navigating to lobby.`);
           // URL을 루트로 변경
           navigate('/');
           onScreenChange('lobby');
@@ -55,7 +55,8 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
     }
 
     setupRoomListeners(room);
-  }, [onScreenChange, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setupRoomListeners = (room: any) => {
     // 방 코드는 roomId를 사용 (실제 방 참가에 사용 가능한 코드)
@@ -89,8 +90,8 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
       }
       
       // 호스트 확인
-      setIsHost(state.host === room.sessionId);
-      console.log('호스트 여부:', state.host === room.sessionId);
+      setHostId(state.host);
+      console.log(`호스트 여부: ${state.host} === ${room.sessionId} -> ${state.host === room.sessionId}`);
     };
 
     // 초기 상태 로드
@@ -118,10 +119,9 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
           });
         });
         setPlayers(playerList);
-        console.log('플레이어 목록 업데이트:', playerList);
         
         // 호스트 확인
-        setIsHost(state.host === room.sessionId);
+        setHostId(state.host);
       }
     });
 
@@ -192,11 +192,6 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
           }
         ];
       });
-      
-      // 호스트 변경 확인
-      if (message.isHost) {
-        setIsHost(message.playerId === room.sessionId);
-      }
     });
 
     room.onMessage('playerReconnected', (message: any) => {
@@ -218,11 +213,6 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
       setPlayers(prevPlayers => 
         prevPlayers.filter(player => player.id !== message.playerId)
       );
-      
-      // 호스트 변경 확인
-      if (message.newHost) {
-        setIsHost(message.newHost === room.sessionId);
-      }
     });
 
     // 방에서 나갈 때 정리
@@ -243,8 +233,8 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
   };
 
   const handleStartGame = () => {
-    const room = ColyseusService.getRoom();
-    if (room && isHost) {
+    const room = roomRef.current;
+    if (room && room.sessionId === hostId) {
       room.send('start', { rounds });
     }
   };
@@ -263,6 +253,7 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
   };
 
   const allPlayersReady = players.length > 0 && players.every(player => player.isReady);
+  const isHost = roomRef.current?.sessionId === hostId;
 
   // 재연결 중일 때 로딩 화면 표시
   if (isReconnecting) {
@@ -368,4 +359,4 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
   );
 };
 
-export default WaitingScreen; 
+export default WaitingScreen;

@@ -1,23 +1,43 @@
 import { Client, Room } from "colyseus.js";
 
+// UUID 생성 함수
+function generateUuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 class ColyseusService {
   private client: Client;
   private room: Room | null = null;
   private isConnected: boolean = false;
+  private guestId: string;
   private roomInfo: { roomId: string; sessionId: string; nickname: string } | null = null;
 
   constructor() {
     this.client = new Client("ws://localhost:2567");
+    this.guestId = this.getOrCreateGuestId();
+  }
+
+  private getOrCreateGuestId(): string {
+    let guestId = localStorage.getItem("guestId");
+    if (!guestId) {
+      guestId = generateUuid();
+      localStorage.setItem("guestId", guestId);
+    }
+    return guestId;
   }
 
   async connectToRoom(roomName?: string): Promise<Room> {
     try {
+      const options = { guestId: this.guestId, roomName };
       if (roomName) {
         // 기존 방에 참가
-        this.room = await this.client.join("my_room", { roomName });
+        this.room = await this.client.join("my_room", options);
       } else {
         // 새 방 생성 또는 참가
-        this.room = await this.client.joinOrCreate("my_room");
+        this.room = await this.client.joinOrCreate("my_room", { guestId: this.guestId });
       }
 
       this.isConnected = true;
@@ -48,7 +68,7 @@ class ColyseusService {
 
   async createRoom(): Promise<Room> {
     try {
-      this.room = await this.client.create("my_room");
+      this.room = await this.client.create("my_room", { guestId: this.guestId });
       this.isConnected = true;
       
       // 방 정보 저장
@@ -78,7 +98,7 @@ class ColyseusService {
   async joinRoom(roomId: string): Promise<Room> {
     try {
       // roomId가 실제 방 ID인지 확인하고 참가
-      this.room = await this.client.joinById(roomId);
+      this.room = await this.client.joinById(roomId, { guestId: this.guestId });
       this.isConnected = true;
       
       // 방 정보 저장
@@ -136,9 +156,9 @@ class ColyseusService {
       this.roomInfo = {
         roomId: this.room.roomId,
         sessionId: this.room.sessionId,
-        nickname: sessionStorage.getItem('current_nickname') || ''
+        nickname: localStorage.getItem('current_nickname') || ''
       };
-      sessionStorage.setItem('room_info', JSON.stringify(this.roomInfo));
+      localStorage.setItem('room_info', JSON.stringify(this.roomInfo));
       console.log('방 정보 저장됨:', this.roomInfo);
     }
   }
@@ -146,13 +166,13 @@ class ColyseusService {
   // 방 정보 삭제
   private clearRoomInfo() {
     this.roomInfo = null;
-    sessionStorage.removeItem('room_info');
+    localStorage.removeItem('room_info');
   }
 
   // 저장된 방 정보 가져오기
   getSavedRoomInfo() {
     if (!this.roomInfo) {
-      const saved = sessionStorage.getItem('room_info');
+      const saved = localStorage.getItem('room_info');
       if (saved) {
         this.roomInfo = JSON.parse(saved);
         console.log('저장된 방 정보 로드됨:', this.roomInfo);
@@ -170,7 +190,8 @@ class ColyseusService {
 
     try {
       console.log('저장된 방에 재연결 시도:', savedInfo.roomId);
-      this.room = await this.client.joinById(savedInfo.roomId);
+      // 재연결 시에도 guestId 전달
+      this.room = await this.client.joinById(savedInfo.roomId, { guestId: this.guestId });
       this.isConnected = true;
       
       // 재연결 시 기존 닉네임 확인
@@ -185,7 +206,7 @@ class ColyseusService {
         // 기존 닉네임이 있으면 저장된 정보 업데이트
         if (message.nickname && message.nickname !== '익명') {
           this.roomInfo = { ...this.roomInfo!, nickname: message.nickname };
-          sessionStorage.setItem('room_info', JSON.stringify(this.roomInfo));
+          localStorage.setItem('room_info', JSON.stringify(this.roomInfo));
         }
       });
       
@@ -219,4 +240,4 @@ class ColyseusService {
   }
 }
 
-export default new ColyseusService(); 
+export default new ColyseusService();

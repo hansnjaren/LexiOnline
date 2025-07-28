@@ -3,6 +3,8 @@ import { Schema, type, ArraySchema } from "@colyseus/schema";
 
 export class PlayerState extends Schema {
   @type("string") sessionId = "";
+  
+  @type("string") guestId = "";
 
   @type([ "int8" ]) hand = new ArraySchema<number>();
 
