@@ -50,7 +50,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
     console.log('[OAuthCallback] id_token:', idToken);
 
     if (idToken) {
-      fetch('http://34.47.120.134:2567/api/auth/google', {
+      fetch('https://34.47.120.134:2567/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: idToken }),
