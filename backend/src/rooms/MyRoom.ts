@@ -8,6 +8,8 @@ import { dealCards } from "../gameLogic/dealCards";
 import { findPlayerWithCloud3 } from "../gameLogic/findPlayerWithCloud3";
 import { calculateRoundScores, calculateRoundScoreMatrix } from "../gameLogic/scoreCalculator";
 import { MADE_NONE } from "../gameLogic/cardEvaluator";
+import prisma from "../../prisma/client";
+import jwt, { JwtPayload } from "jsonwebtoken"
 import {
   handleSubmit,
   handlePass,
@@ -15,6 +17,9 @@ import {
   handleEasyMode,
   IMyRoom,
 } from "../roomLogic/messageHandlers";
+import { calculateRanks } from "../gameLogic/calculateRanks";
+import { calculateRatings } from "../gameLogic/calculateRatings";
+import { DEFAULT_RATING_MU, DEFAULT_RATING_SIGMA } from "../constants/rating";
 
 export class MyRoom extends Room<MyRoomState> implements IMyRoom {
   maxClients = 5;
@@ -65,9 +70,44 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     });
   }
 
-  onJoin(client: Client) {
+  async onJoin(client: Client, options: any) {
     const player = new PlayerState();
     player.sessionId = client.sessionId;
+    if (options.authToken) {
+      try {
+        const decoded = jwt.verify(options.authToken, process.env.JWT_SECRET) as JwtPayload & { userId?: number };
+        player.userId = decoded.userId ?? null; // JWT payload에 userId가 들어있다고 가정
+        // ratingMu, ratingSigma setting
+        if (player.userId !== null) {
+          // DB에서 rating 값 조회 (예: Prisma 사용)
+          const user = await prisma.user.findUnique({
+            where: { id: player.userId },
+            select: { rating_mu: true, rating_sigma: true }
+          });
+
+          if (user) {
+            player.ratingMu = user.rating_mu;
+            player.ratingSigma = user.rating_sigma;
+          } else {
+            // DB에 유저가 없으면 기본값 할당
+            player.ratingMu = DEFAULT_RATING_MU;
+            player.ratingSigma = DEFAULT_RATING_SIGMA;
+          }
+        } else {
+          // 비로그인 유저 기본값
+          player.ratingMu = DEFAULT_RATING_MU;
+          player.ratingSigma = DEFAULT_RATING_SIGMA;
+        }
+      } catch (err) {
+        player.userId = null; // 비로그인/비정상 토큰
+        player.ratingMu = DEFAULT_RATING_MU
+        player.ratingSigma = DEFAULT_RATING_SIGMA
+      }
+    } else {
+      player.userId = null; // 비로그인 유저
+      player.ratingMu = DEFAULT_RATING_MU
+      player.ratingSigma = DEFAULT_RATING_SIGMA
+    }
     this.state.players.set(client.sessionId, player);
     this.state.playerOrder.unshift(client.sessionId);
 
@@ -206,18 +246,53 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     else this.startRound();
   }
 
-  endGame() {
+  // === 수정된 부분 (게임 종료 시 DB 저장)
+  async endGame() {
     // 1) 최종 점수 수집
     const finalScores = Array.from(this.state.players.entries()).map(([sessionId, player]) => ({
       playerId: sessionId,
+      userId: player.userId,
       score: player.score,
       nickname: player.nickname,
+      rating_mu_before: player.ratingMu,
+      rating_sigma_before: player.ratingSigma
     }));
 
-    // 2) 최종 점수 클라이언트에 방송
-    this.broadcast("gameEnded", { finalScores });
+    const finalScoresWithRank = calculateRanks(finalScores);
 
-    // 3) 게임 상태 초기화 또는 대기 상태로 전환
+    const finalScoresWithRating = calculateRatings(finalScoresWithRank);
+
+    // 4) 로그인 유저에 대해서만 DB 저장
+    for (const { userId, score, rank, rating_mu_before, rating_sigma_before, rating_mu_after, rating_sigma_after } of finalScoresWithRating) {
+      if (!userId) {
+        // 비로그인 유저면 저장하지 않고 건너뜀
+        continue;
+      }
+
+      try {
+        await prisma.gameHistory.create({
+          data: {
+            userId,
+            playerCount: finalScores.length,
+            rank,
+            score,
+            scoresAll: finalScores.map(f => f.score), // 모든 참가자 점수 배열
+            rating_mu_before,
+            rating_sigma_before,
+            rating_mu_after,
+            rating_sigma_after,
+            gameId: this.roomId,
+          },
+        });
+      } catch (err) {
+        console.error(`Failed to save game history for user ${userId}`, err);
+      }
+    }
+
+    // 3) 최종 점수 클라이언트에 방송
+    this.broadcast("gameEnded", { finalScoresWithRating });
+
+    // 4) 게임 상태 초기화 또는 대기 상태로 전환
     this.resetGameState();
   }
 
