@@ -1,6 +1,7 @@
 // src/rooms/schema/PlayerState.ts
 import { Schema, type, ArraySchema } from "@colyseus/schema";
 import { DEFAULT_RATING_MU, DEFAULT_RATING_SIGMA } from "../../constants/rating";
+import { STARTING_COIN } from "../../constants/gameSettings";
 
 export class PlayerState extends Schema {
   @type("string") sessionId = "";
@@ -13,7 +14,7 @@ export class PlayerState extends Schema {
 
   @type([ "int8" ]) hand = new ArraySchema<number>();
 
-  @type("number") score = 0;
+  @type("number") score = STARTING_COIN;
 
   @type("string") nickname = "";
 
