@@ -73,6 +73,26 @@
   border-left: 0.3vw solid #17a2b8;
 }
 
+/* 테두리 숨기기 */
+.toast.no-border {
+  border-left: none;
+}
+
+/* 복사 알림용 밝은 배경 */
+.toast.copy-notification {
+  background: rgba(255, 255, 255, 0.95);
+  border: 0.1vw solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1vw 3vw rgba(0, 0, 0, 0.2);
+}
+
+.toast.copy-notification .toast-message {
+  color: #333333;
+}
+
+.toast.copy-notification .toast-icon {
+  color: #28a745;
+}
+
 /* 반응형 디자인 */
 @media (max-width: 768px) {
   .toast {
