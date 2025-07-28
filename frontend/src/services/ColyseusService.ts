@@ -33,19 +33,14 @@ class ColyseusService {
     try {
       const options = { guestId: this.guestId, roomName };
       if (roomName) {
-        // 기존 방에 참가
         this.room = await this.client.join("my_room", options);
       } else {
-        // 새 방 생성 또는 참가
         this.room = await this.client.joinOrCreate("my_room", { guestId: this.guestId });
       }
 
       this.isConnected = true;
-      
-      // 방 정보 저장
       this.saveRoomInfo();
       
-      // 연결 상태 이벤트 리스너
       this.room.onLeave((code) => {
         console.log("방에서 나갔습니다:", code);
         this.isConnected = false;
@@ -70,11 +65,8 @@ class ColyseusService {
     try {
       this.room = await this.client.create("my_room", { guestId: this.guestId });
       this.isConnected = true;
-      
-      // 방 정보 저장
       this.saveRoomInfo();
       
-      // 연결 상태 이벤트 리스너
       this.room.onLeave((code) => {
         console.log("방에서 나갔습니다:", code);
         this.isConnected = false;
@@ -97,14 +89,10 @@ class ColyseusService {
 
   async joinRoom(roomId: string): Promise<Room> {
     try {
-      // roomId가 실제 방 ID인지 확인하고 참가
       this.room = await this.client.joinById(roomId, { guestId: this.guestId });
       this.isConnected = true;
-      
-      // 방 정보 저장
       this.saveRoomInfo();
       
-      // 연결 상태 이벤트 리스너
       this.room.onLeave((code) => {
         console.log("방에서 나갔습니다:", code);
         this.isConnected = false;
@@ -150,7 +138,6 @@ class ColyseusService {
     this.clearRoomInfo();
   }
 
-  // 방 정보 저장
   private saveRoomInfo() {
     if (this.room) {
       this.roomInfo = {
@@ -159,81 +146,54 @@ class ColyseusService {
         nickname: localStorage.getItem('current_nickname') || ''
       };
       localStorage.setItem('room_info', JSON.stringify(this.roomInfo));
-      console.log('방 정보 저장됨:', this.roomInfo);
     }
   }
 
-  // 방 정보 삭제
   private clearRoomInfo() {
     this.roomInfo = null;
     localStorage.removeItem('room_info');
   }
 
-  // 저장된 방 정보 가져오기
   getSavedRoomInfo() {
     if (!this.roomInfo) {
       const saved = localStorage.getItem('room_info');
       if (saved) {
         this.roomInfo = JSON.parse(saved);
-        console.log('저장된 방 정보 로드됨:', this.roomInfo);
       }
     }
     return this.roomInfo;
   }
 
-  // 저장된 방에 재연결 시도
   async reconnectToSavedRoom(): Promise<Room | null> {
     const savedInfo = this.getSavedRoomInfo();
-    if (!savedInfo) {
+    if (!savedInfo || !savedInfo.roomId) {
+      this.clearRoomInfo();
       return null;
     }
 
     try {
-      console.log('저장된 방에 재연결 시도:', savedInfo.roomId);
-      // 재연결 시에도 guestId 전달
+      console.log(`저장된 방에 재연결 시도 (joinById with guestId): roomId=${savedInfo.roomId}`);
       this.room = await this.client.joinById(savedInfo.roomId, { guestId: this.guestId });
       this.isConnected = true;
       
-      // 재연결 시 기존 닉네임 확인
-      console.log('재연결 완료. 기존 닉네임 확인 중:', savedInfo.nickname);
-      
-      // 서버에 기존 닉네임 확인 요청
-      this.room.send('checkNickname');
-      
-      // 닉네임 확인 응답 처리
-      this.room.onMessage('nicknameConfirmed', (message) => {
-        console.log('기존 닉네임 확인됨:', message.nickname);
-        // 기존 닉네임이 있으면 저장된 정보 업데이트
-        if (message.nickname && message.nickname !== '익명') {
-          this.roomInfo = { ...this.roomInfo!, nickname: message.nickname };
-          localStorage.setItem('room_info', JSON.stringify(this.roomInfo));
-        }
-      });
-      
-      // 연결 상태 이벤트 리스너 재설정
-      this.room.onLeave((code) => {
-        console.log("방에서 나갔습니다:", code);
-        this.isConnected = false;
-        this.room = null;
-        this.clearRoomInfo();
-      });
+      if (this.room) {
+        this.saveRoomInfo(); // Update session ID in storage
+        this.room.onLeave((code) => {
+          console.log("방에서 나갔습니다:", code);
+          this.isConnected = false;
+          this.room = null;
+          this.clearRoomInfo();
+        });
+        this.room.onError((code, message) => {
+          console.error("방 연결 오류:", code, message);
+          this.isConnected = false;
+          this.clearRoomInfo();
+        });
+      }
 
-      this.room.onError((code, message) => {
-        console.error("방 연결 오류:", code, message);
-        this.isConnected = false;
-        this.clearRoomInfo();
-      });
-
-      console.log('저장된 방 재연결 성공');
       return this.room;
     } catch (error) {
       console.error("저장된 방 재연결 실패:", error);
-      
-      // 방이 존재하지 않는 경우 (정상적인 상황)
-      if (error instanceof Error && error.message && error.message.includes('not found')) {
-        console.log('방이 이미 닫혔거나 존재하지 않습니다. 저장된 정보를 삭제합니다.');
-      }
-      
       this.clearRoomInfo();
       return null;
     }

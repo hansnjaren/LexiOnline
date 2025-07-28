@@ -25,36 +25,57 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
   const [hostId, setHostId] = useState('');
   const [rounds, setRounds] = useState(3);
   const [isReady, setIsReady] = useState(false);
-  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(true);
+  const reconnectAttempted = useRef(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
     console.log(`[WaitingScreen] useEffect triggered. Current time: ${new Date().toLocaleTimeString()}`);
-    let room = ColyseusService.getRoom();
-    roomRef.current = room;
     
-    // 방에 연결되지 않은 경우, 저장된 방 정보로 재연결 시도
-    if (!room) {
-      console.log(`[WaitingScreen] No room instance found. Attempting to reconnect...`);
-      setIsReconnecting(true);
-      ColyseusService.reconnectToSavedRoom().then(reconnectedRoom => {
-        setIsReconnecting(false);
-        if (reconnectedRoom) {
-          roomRef.current = reconnectedRoom;
-          console.log(`[WaitingScreen] Reconnection successful. Room ID: ${reconnectedRoom.roomId}`);
-          setupRoomListeners(reconnectedRoom);
-        } else {
-          console.log(`[WaitingScreen] Reconnection failed. Navigating to lobby.`);
-          // URL을 루트로 변경
+    const initialize = async () => {
+      let room = ColyseusService.getRoom();
+      
+      if (!room && !reconnectAttempted.current) {
+        reconnectAttempted.current = true;
+        console.log('[WaitingScreen] No room instance, attempting to reconnect...');
+        
+        try {
+          const reconnectedRoom = await ColyseusService.reconnectToSavedRoom();
+          if (reconnectedRoom) {
+            console.log(`[WaitingScreen] Reconnection successful. Room ID: ${reconnectedRoom.roomId}`);
+            room = reconnectedRoom;
+          } else {
+            console.log('[WaitingScreen] Reconnection failed, navigating to lobby.');
+            navigate('/');
+            onScreenChange('lobby');
+            setIsReconnecting(false);
+            return;
+          }
+        } catch (error) {
+          console.error('[WaitingScreen] Reconnection error:', error);
           navigate('/');
           onScreenChange('lobby');
+          setIsReconnecting(false);
+          return;
         }
-      });
-      return;
-    }
+      }
+      
+      if (room) {
+        roomRef.current = room;
+        setupRoomListeners(room);
+      } else if (!reconnectAttempted.current) {
+        // This case should ideally not be hit if logic is correct
+        console.log('[WaitingScreen] No room and no reconnection attempt, navigating to lobby.');
+        navigate('/');
+        onScreenChange('lobby');
+      }
+      
+      setIsReconnecting(false);
+    };
 
-    setupRoomListeners(room);
+    initialize();
+    
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -72,6 +93,8 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
         const seenIds = new Set<string>();
         
         state.players.forEach((player: any, sessionId: string) => {
+          if (!player.connected) return; // 연결되지 않은 플레이어는 UI에 표시하지 않음
+
           // 중복 체크
           if (seenIds.has(sessionId)) {
             console.log('중복 플레이어 ID 발견:', sessionId);
@@ -126,6 +149,30 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
     });
 
     // 메시지 수신
+    room.onMessage('reconnected', (message: any) => {
+      console.log('재연결 완료:', message);
+      const { roomState } = message;
+      
+      // 전체 상태를 기반으로 UI 업데이트
+      const playerList: Player[] = [];
+      Object.entries(roomState.players).forEach(([sessionId, player]: [string, any]) => {
+        playerList.push({
+          id: sessionId,
+          nickname: player.nickname || '익명',
+          isReady: player.ready || false,
+        });
+      });
+      setPlayers(playerList);
+      setHostId(roomState.host);
+      setRounds(roomState.totalRounds);
+
+      // 현재 플레이어의 준비 상태 업데이트
+      const currentPlayer = roomState.players[room.sessionId];
+      if (currentPlayer) {
+        setIsReady(currentPlayer.ready);
+      }
+    });
+
     room.onMessage('gameStarted', () => {
       console.log('게임이 시작되었습니다!');
       onScreenChange('game');

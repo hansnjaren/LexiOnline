@@ -31,6 +31,15 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
   });
 
   useEffect(() => {
+    // Check for saved room info and redirect to waiting screen if it exists
+    const savedRoomInfo = localStorage.getItem('room_info');
+    if (savedRoomInfo) {
+      console.log('Saved room info found, redirecting to waiting room.');
+      navigate('/waiting');
+    }
+  }, [navigate]);
+
+  useEffect(() => {
     if (!token) {
       setUser(null);
       setIsLoading(false);

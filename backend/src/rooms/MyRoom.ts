@@ -104,54 +104,49 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
   }
 
   onJoin(client: Client, options: { guestId?: string }) {
-    // 재연결 처리
     if (options.guestId) {
-      const oldPlayer = Array.from(this.state.players.values()).find(p => p.guestId === options.guestId);
-      if (oldPlayer) {
-        console.log(`[MyRoom] Reconnecting player. GuestId: ${options.guestId}`);
+      const existingPlayer = Array.from(this.state.players.values()).find(p => p.guestId === options.guestId);
+      
+      if (existingPlayer) {
+        console.log(`[MyRoom] Player ${existingPlayer.nickname} rejoining with new session ${client.sessionId}`);
         
-        // 데이터 이전을 위한 새 플레이어 객체 생성
-        const newPlayer = new PlayerState();
-        newPlayer.sessionId = client.sessionId;
-        newPlayer.guestId = oldPlayer.guestId;
-        newPlayer.nickname = oldPlayer.nickname;
-        newPlayer.score = oldPlayer.score;
-        newPlayer.ready = oldPlayer.ready;
-        newPlayer.easyMode = oldPlayer.easyMode;
-        newPlayer.hand = new ArraySchema<number>(...oldPlayer.hand);
+        const oldSessionId = existingPlayer.sessionId;
+        
+        this.state.players.delete(oldSessionId);
+        existingPlayer.sessionId = client.sessionId;
+        existingPlayer.connected = true;
+        this.state.players.set(client.sessionId, existingPlayer);
 
-        this.state.players.set(client.sessionId, newPlayer);
-
-        // playerOrder 업데이트
-        const orderIndex = this.state.playerOrder.indexOf(oldPlayer.sessionId);
+        const orderIndex = this.state.playerOrder.indexOf(oldSessionId);
         if (orderIndex !== -1) {
           this.state.playerOrder[orderIndex] = client.sessionId;
-        } else {
-          this.state.playerOrder.unshift(client.sessionId);
         }
 
-        // 호스트 정보 갱신
-        if (this.state.host === oldPlayer.sessionId) {
+        if (this.state.host === oldSessionId) {
           this.state.host = client.sessionId;
         }
 
-        // 이전 플레이어(유령) 즉시 제거
-        this.state.players.delete(oldPlayer.sessionId);
-        
+        // 재연결된 클라이언트에게 현재 방 상태 전송
+        client.send("reconnected", {
+          roomState: this.state,
+          isHost: this.state.host === client.sessionId
+        });
+
+        // 다른 클라이언트에게 재연결 알림
         this.broadcast("playerReconnected", {
           playerId: client.sessionId,
-          nickname: newPlayer.nickname || '익명',
-          isHost: this.state.host === client.sessionId
+          nickname: existingPlayer.nickname
         }, { except: client });
+
         return;
       }
     }
 
-    // 새로운 플레이어 처리
-    console.log(`[MyRoom] New player joining. GuestId: ${options.guestId}`);
+    console.log(`[MyRoom] New player ${client.sessionId} joining.`);
     const player = new PlayerState();
     player.sessionId = client.sessionId;
     player.guestId = options.guestId || "";
+    player.connected = true;
 
     this.state.players.set(client.sessionId, player);
     this.state.playerOrder.unshift(client.sessionId);
@@ -168,26 +163,21 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
   }
 
   onLeave(client: Client, consented: boolean) {
-    console.log(`[MyRoom] onLeave called for client: ${client.sessionId}. Consented: ${consented}`);
-    
-    // 의도적으로 나간 경우 즉시 제거
-    if (consented) {
-      this.removePlayer(client.sessionId);
-      return;
-    }
+    const player = this.state.players.get(client.sessionId);
+    if (!player) return;
 
-    // 새로고침 등 비정상적인 종료의 경우, onJoin이 먼저 처리될 수 있도록 잠시 대기
+    console.log(`[MyRoom] Player ${client.sessionId} disconnected. Consented: ${consented}`);
+    player.connected = false;
+
     this.clock.setTimeout(() => {
-      const player = this.state.players.get(client.sessionId);
-      if (player) {
-        console.log(`[MyRoom] Player ${client.sessionId} did not reconnect in time. Removing.`);
-        this.removePlayer(client.sessionId);
+      if (!player.connected) {
+        console.log(`[MyRoom] Cleaning up disconnected player ${player.sessionId}`);
+        this.removePlayer(player.sessionId);
       }
-    }, 1000); // 1초의 유예 시간
+    }, 20000);
   }
 
   removePlayer(sessionId: string) {
-    console.log(`[MyRoom] removePlayer called for sessionId: ${sessionId}`);
     const wasHost = sessionId === this.state.host;
     this.state.players.delete(sessionId);
     const idx = this.state.playerOrder.indexOf(sessionId);
@@ -200,7 +190,6 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       playerId: sessionId,
       newHost: wasHost ? this.state.host : null
     });
-    console.log(`[MyRoom] removePlayer: Player removed. Total players: ${this.state.players.size}`);
   }
 
   onDispose() {
