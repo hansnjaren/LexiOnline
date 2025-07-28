@@ -43,7 +43,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
         setUser(null);
         setToken(null);
         sessionStorage.removeItem('access_token');
-        navigate('/login');
+        navigate('/');
       });
   }, [token, navigate]);
 
