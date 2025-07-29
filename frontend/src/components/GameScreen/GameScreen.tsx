@@ -407,6 +407,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       
       // 백엔드 상태로부터 모든 플레이어의 남은 카드 수 동기화
       syncPlayerRemainingCards();
+      
+      // 선택된 카드들 모두 해제
+      setSelectedCards([]);
     });
 
     room.onMessage('cycleEnded', (message) => {
@@ -433,6 +436,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         ...prev,
         currentTurnId: prev.currentTurnId + 1
       }));
+      
+      // 선택된 카드들 모두 해제
+      setSelectedCards([]);
       
       // 모든 플레이어 정보 업데이트
       if (message.allPlayers) {

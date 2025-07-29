@@ -122,6 +122,15 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
         
         // 호스트 확인
         setIsHost(state.host === room.sessionId);
+        
+        // 본인이 그룹에 포함되어 있는지 확인
+        const isInGroup = state.players.has(room.sessionId);
+        if (!isInGroup) {
+          console.log('본인이 그룹에서 제외되었습니다. 로비로 이동합니다.');
+          ColyseusService.disconnect();
+          navigate('/');
+          onScreenChange('lobby');
+        }
       }
     });
 
@@ -222,6 +231,14 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
       // 호스트 변경 확인
       if (message.newHost) {
         setIsHost(message.newHost === room.sessionId);
+      }
+      
+      // 본인이 퇴장당했는지 확인
+      if (message.playerId === room.sessionId) {
+        console.log('본인이 그룹에서 퇴장당했습니다. 로비로 이동합니다.');
+        ColyseusService.disconnect();
+        navigate('/');
+        onScreenChange('lobby');
       }
     });
 
