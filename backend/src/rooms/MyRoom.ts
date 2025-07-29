@@ -416,7 +416,8 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
         playerId: id,
         score: p.score,
         nickname: p.nickname || '익명',
-        scoreDiff: scoreDiffMap.get(id) || 0
+        scoreDiff: scoreDiffMap.get(id) || 0,
+        remainingTiles: p.hand ? p.hand.length : 0 // 남은 패 개수 추가
       })),
       round: this.state.round,
       isGameEnd: false
@@ -446,6 +447,7 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       playerId: sessionId,
       score: player.score,
       nickname: player.nickname,
+      remainingTiles: player.hand ? player.hand.length : 0 // 남은 패 개수 추가
     }));
 
     // 2) 최종 점수 클라이언트에 방송

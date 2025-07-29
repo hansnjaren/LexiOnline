@@ -257,7 +257,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
 
     room.onMessage('gameEnded', (message) => {
       console.log('게임 종료:', message);
-      onScreenChange('result');
+      onScreenChange('result', message);
     });
 
     room.onMessage('roundEnded', (message) => {
@@ -266,6 +266,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       // message.scores: 각 플레이어의 점수 정보
       // message.round: 종료된 라운드 번호
       // message.isGameEnd: 게임 종료 여부
+      
+      // 게임 보드 초기화 (새 라운드 시작을 위해)
+      setBoardCards([]);
+      setBoardSize({ rows: 4, cols: 15 });
+      setPendingCards([]);
+      
       onScreenChange('result', message);
     });
 
