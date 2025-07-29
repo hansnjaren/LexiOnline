@@ -103,6 +103,19 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     value: number;
     color: string;
   }>>([]);
+  const [isProcessingPendingCards, setIsProcessingPendingCards] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // 게임 상태 (lastType, lastMadeType 등)
+  const [gameState, setGameState] = useState<{
+    lastType: number;
+    lastMadeType: number;
+    lastHighestValue: number;
+  }>({
+    lastType: 0,
+    lastMadeType: 0,
+    lastHighestValue: 0
+  });
   
   // 플레이어 정보 (백엔드에서 동적으로 가져옴)
   const [players, setPlayers] = useState<Player[]>([]);
@@ -156,6 +169,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         
         // 백엔드 상태로부터 모든 플레이어의 남은 카드 수 동기화
         syncPlayerRemainingCards();
+        
+        // 게임 상태 업데이트 (lastType, lastMadeType, lastHighestValue)
+        setGameState({
+          lastType: state.lastType || 0,
+          lastMadeType: state.lastMadeType || 0,
+          lastHighestValue: state.lastHighestValue || 0
+        });
         
         // 게임이 이미 시작되었고 손패가 있다면 손패만 업데이트 (애니메이션 없이)
         const myPlayer = state.players.get(room.sessionId);
@@ -311,11 +331,32 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
           };
         });
         
-        setPendingCards(prev => [...prev, ...submittedCards]);
+        // 중복 방지를 위해 기존 pendingCards와 비교
+        setPendingCards(prev => {
+          const newCards = submittedCards.filter((newCard: any) => 
+            !prev.some((existingCard: any) => 
+              existingCard.value === newCard.value && existingCard.color === newCard.color
+            )
+          );
+          return [...prev, ...newCards];
+        });
       }
       
       // 백엔드 상태로부터 모든 플레이어의 남은 카드 수 동기화
       syncPlayerRemainingCards();
+      
+      // 게임 상태 업데이트 (백엔드에서 업데이트된 lastType, lastMadeType 등)
+      const currentRoom = ColyseusService.getRoom();
+      if (currentRoom) {
+        setGameState({
+          lastType: currentRoom.state.lastType || 0,
+          lastMadeType: currentRoom.state.lastMadeType || 0,
+          lastHighestValue: currentRoom.state.lastHighestValue || 0
+        });
+      }
+      
+      // 제출 완료 후 플래그 리셋
+      setIsSubmitting(false);
     });
 
     room.onMessage('pass', (message) => {
@@ -323,6 +364,17 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       
       // 백엔드 상태로부터 모든 플레이어의 남은 카드 수 동기화
       syncPlayerRemainingCards();
+    });
+
+    room.onMessage('cycleEnded', (message) => {
+      console.log('사이클 종료:', message);
+      
+      // 사이클이 끝나면 게임 상태 리셋
+      setGameState({
+        lastType: 0,
+        lastMadeType: 0,
+        lastHighestValue: 0
+      });
     });
 
     room.onMessage('turnChanged', (message) => {
@@ -352,11 +404,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     room.onMessage('submitRejected', (message) => {
       console.log('카드 제출 거부:', message);
       alert('카드 제출이 거부되었습니다: ' + message.reason);
+      setIsSubmitting(false);
     });
 
     room.onMessage('noCard', (message) => {
       console.log('카드 없음 오류:', message);
       alert('보유하지 않은 카드를 제출하려고 했습니다: ' + message.reason);
+      setIsSubmitting(false);
     });
 
     room.onMessage('passRejected', (message) => {
@@ -471,18 +525,175 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     return isMyTurn;
   };
 
-  // 카드 번호를 색상으로 변환
+  // 카드 번호를 색상으로 변환 (올바른 매핑)
   const getCardColorFromNumber = (cardNumber: number): string => {
-    // 카드 번호를 4로 나눈 나머지로 색상 결정
+    // 카드 번호를 4로 나눈 나머지로 색상 결정 (0,1,2,3)
     const colorIndex = cardNumber % 4;
     const colors = ['gold', 'silver', 'bronze', 'black'];
     return colors[colorIndex];
   };
 
-  // 카드 번호를 값으로 변환
+  // 카드 번호를 값으로 변환 (올바른 매핑)
   const getCardValueFromNumber = (cardNumber: number): number => {
     // 카드 번호를 4로 나눈 몫 + 1로 값 결정
     return Math.floor(cardNumber / 4) + 1;
+  };
+
+  // 카드의 실제 순서 값을 계산하는 함수 (백엔드의 getValue와 일치)
+  const getCardOrderValue = (cardNumber: number): number => {
+    const room = ColyseusService.getRoom();
+    const maxNumber = room?.state?.maxNumber || 13;
+    const { type, number } = parseCard(cardNumber, maxNumber);
+    return getValue(number, type, maxNumber);
+  };
+
+  // 백엔드의 parseCard 함수와 동일한 로직
+  const parseCard = (card: number, maxNumber: number) => {
+    const type = Math.floor(card / maxNumber);
+    const number = (card + maxNumber - 2) % maxNumber;
+    return { type, number };
+  };
+
+  // 백엔드의 getOrderIndex 함수와 동일한 로직
+  const getOrderIndex = (n: number, maxNumber: number): number => {
+    if (n === 0) return maxNumber - 2;
+    if (n === 1) return maxNumber - 1;
+    return n - 2;
+  };
+
+  // 백엔드의 getValue 함수와 동일한 로직
+  const getValue = (number: number, type: number, maxNumber: number): number => {
+    return getOrderIndex(number, maxNumber) * maxNumber + type;
+  };
+
+  // 백엔드의 evaluateSimpleCombo에서 사용하는 잘못된 계산 방식 (디버깅용)
+  const getWrongValue = (number: number, type: number, maxNumber: number): number => {
+    return number * maxNumber + type;
+  };
+
+  // 백엔드의 evaluateSimpleCombo에서 사용하는 계산 방식 (실제 사용됨)
+  const getSimpleComboValue = (cardNumber: number): number => {
+    const room = ColyseusService.getRoom();
+    const maxNumber = room?.state?.maxNumber || 13;
+    const { type, number } = parseCard(cardNumber, maxNumber);
+    return number * maxNumber + type;
+  };
+
+  // lastType을 한국어로 변환하는 함수
+  const getLastTypeText = (lastType: number): string => {
+    switch (lastType) {
+      case 0:
+        return '없음';
+      case 1:
+        return '싱글';
+      case 2:
+        return '원페어';
+      case 3:
+        return '트리플';
+      case 4:
+        return '포카드';
+      case 5:
+        return '메이드';
+      default:
+        return '알 수 없음';
+    }
+  };
+
+  /*
+  0: starting, 1: single, 2: pair, 3: triple, 5: made
+
+  @type("int8") lastMadeType = 0; // 0: not made, 1: straight, 2: flush, 3: full house, 4: four cards, 5: straight flush
+  */
+
+  // lastMadeType을 한국어로 변환하는 함수
+  const getLastMadeTypeText = (lastMadeType: number): string => {
+    switch (lastMadeType) {
+      case 0:
+        return '없음';
+      case 1:
+        return '스트레이트';
+      case 2:
+        return '플러시';
+      case 3:
+        return '풀하우스';
+      case 4:
+        return '포카드';
+      case 5:
+        return '스트레이트플러시';
+      default:
+        return '알 수 없음';
+    }
+  };
+
+  // 현재 조합 텍스트를 생성하는 함수
+  const getCurrentCombinationText = (): string => {
+    if (gameState.lastType === 0) {
+      return '미등록';
+    }
+    
+    if (gameState.lastType === 5) {
+      // 메이드인 경우 lastMadeType 사용
+      return getLastMadeTypeText(gameState.lastMadeType);
+    } else {
+      // 일반 조합인 경우 lastType 사용
+      return getLastTypeText(gameState.lastType);
+    }
+  };
+
+  // 현재 게임 상태의 디버깅 정보를 출력하는 함수
+  const debugGameState = (): string => {
+    const room = ColyseusService.getRoom();
+    const maxNumber = room?.state?.maxNumber || 13;
+    
+    return `게임상태: lastType=${gameState.lastType}, lastMadeType=${gameState.lastMadeType}, lastHighestValue=${gameState.lastHighestValue}, maxNumber=${maxNumber}`;
+  };
+
+  // 카드 제출 가능 여부를 확인하는 함수
+  const canSubmitCards = (cardNumbers: number[]): { canSubmit: boolean; reason: string } => {
+    if (cardNumbers.length === 0) {
+      return { canSubmit: false, reason: "카드를 선택해주세요" };
+    }
+
+    const room = ColyseusService.getRoom();
+    const maxNumber = room?.state?.maxNumber || 13;
+    
+    // 같은 숫자인지 확인
+    const parsed = cardNumbers.map(card => parseCard(card, maxNumber));
+    const firstNumber = parsed[0].number;
+    if (!parsed.every(c => c.number === firstNumber)) {
+      return { canSubmit: false, reason: "같은 숫자의 카드만 제출할 수 있습니다" };
+    }
+
+    // 현재 조합과 비교
+    if (gameState.lastType !== 0 && cardNumbers.length !== gameState.lastType) {
+      return { canSubmit: false, reason: "이전과 같은 개수의 카드를 제출해야 합니다" };
+    }
+
+    // 순서 확인
+    const maxType = Math.max(...parsed.map(c => c.type));
+    const currentValue = firstNumber * maxNumber + maxType;
+    
+    if (currentValue <= gameState.lastHighestValue) {
+      return { canSubmit: false, reason: `순서가 낮습니다. 현재값: ${currentValue}, 이전값: ${gameState.lastHighestValue}` };
+    }
+
+    return { canSubmit: true, reason: "제출 가능" };
+  };
+
+  // 디버깅용: 카드 정보 출력 함수
+  const debugCardInfo = (cardNumber: number): string => {
+    const room = ColyseusService.getRoom();
+    const maxNumber = room?.state?.maxNumber || 13;
+    const { type, number } = parseCard(cardNumber, maxNumber);
+    const orderValue = getCardOrderValue(cardNumber);
+    const color = getCardColorFromNumber(cardNumber);
+    const value = getCardValueFromNumber(cardNumber);
+    const orderIndex = getOrderIndex(number, maxNumber);
+    
+    // 백엔드의 evaluateSimpleCombo에서 사용하는 계산 방식
+    const simpleComboValue = getSimpleComboValue(cardNumber);
+    
+    return `카드${cardNumber}: 색상=${color}, 숫자=${value}, type=${type}, number=${number}, orderIndex=${orderIndex}, 올바른순서값=${orderValue}, 실제순서값=${simpleComboValue}`;
   };
 
   // 백엔드 상태로부터 모든 플레이어의 남은 카드 수 동기화
@@ -566,8 +777,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
 
   // 대기 중인 패들을 보드에 배치하는 함수
   const submitPendingCards = () => {
-    if (pendingCards.length === 0) return;
+    if (pendingCards.length === 0 || isProcessingPendingCards) return;
     
+    setIsProcessingPendingCards(true);
     console.log('submitPendingCards 호출됨, 현재 보드 크기:', boardSize);
     
     // 대기 중인 패들을 보드에 추가 (기존 카드는 전혀 건드리지 않음)
@@ -744,16 +956,19 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         }
       }
     }
+    
+    // 처리 완료 후 플래그 리셋
+    setIsProcessingPendingCards(false);
   };
 
   // 보드 크기가 변경될 때 대기 중인 패 자동 제출
   useEffect(() => {
-    if (pendingCards.length > 0) {
+    if (pendingCards.length > 0 && !isProcessingPendingCards) {
       console.log('useEffect: pendingCards 변경 감지, submitPendingCards 호출');
       // pendingCards가 추가되거나 보드 크기가 변경될 때 즉시 제출 시도
       submitPendingCards();
     }
-  }, [boardSize, pendingCards.length]);
+  }, [boardSize, pendingCards, isProcessingPendingCards]);
 
   const handlePlayerCardReceived = (playerIndex: number) => {
     setPlayers(prev => prev.map((player, index) => 
@@ -856,6 +1071,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   };
 
   const handleSubmitCards = () => {
+    // 중복 제출 방지
+    if (isSubmitting) {
+      console.log('[DEBUG] handleSubmitCards - 이미 제출 중, 중복 호출 방지');
+      return;
+    }
+    
     // 턴 체크 - 자신의 차례가 아니면 함수 실행 중단
     if (!isMyTurn()) {
       console.log('[DEBUG] handleSubmitCards - 자신의 차례가 아님, 함수 실행 중단');
@@ -866,6 +1087,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       alert('제출할 카드를 선택해주세요.');
       return;
     }
+    
+    setIsSubmitting(true);
 
     // 선택된 카드들을 백엔드로 전송
     const room = ColyseusService.getRoom();
@@ -906,6 +1129,24 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         sortedHand: sortedHand.map(c => ({ id: c.id, value: c.value, color: c.color }))
       });
 
+      // 디버깅: 각 카드의 상세 정보 출력
+      cardNumbers.forEach(cardNumber => {
+        console.log(debugCardInfo(cardNumber));
+      });
+
+      // 디버깅: 현재 게임 상태 출력
+      console.log(debugGameState());
+
+      // 제출 가능 여부 확인
+      const validation = canSubmitCards(cardNumbers);
+      console.log(`[DEBUG] 제출 검증: ${validation.reason}`);
+      
+      if (!validation.canSubmit) {
+        alert(`제출 불가: ${validation.reason}`);
+        setIsSubmitting(false);
+        return;
+      }
+
       // 백엔드에 submit 메시지 전송
       console.log(`[DEBUG] submit 메시지 전송: sessionId=${room.sessionId}, submitCards=${cardNumbers.join(', ')}`);
       room.send('submit', { submitCards: cardNumbers });
@@ -913,6 +1154,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       // 선택 상태 초기화 (백엔드 응답 대기)
       setSelectedCards([]);
     }
+    
+    // 제출 완료 후 플래그 리셋
+    setIsSubmitting(false);
   };
 
   const handleSortByNumber = () => {
@@ -1098,7 +1342,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
             {/* 중앙 - 현재 조합 및 버튼들 */}
             <div className="center-controls">
               <div className="current-combination">
-                <span>현재 조합</span>
+                <span>현재 조합: {getCurrentCombinationText()}</span>
               </div>
               <div className="control-buttons">
                 <button 
@@ -1122,17 +1366,17 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
             {/* 우측 - Drop/Pass 버튼 */}
             <div className="action-buttons">
               <button 
-                className={`action-btn drop-btn ${showCardDealAnimation || !isMyTurn() ? 'disabled' : ''}`} 
+                className={`action-btn drop-btn ${showCardDealAnimation || !isMyTurn() || isSubmitting ? 'disabled' : ''}`} 
                 onClick={(e) => {
                   e.preventDefault();
-                  if (showCardDealAnimation || !isMyTurn()) {
+                  if (showCardDealAnimation || !isMyTurn() || isSubmitting) {
                     console.log('[DEBUG] Submit 버튼 클릭 - 비활성화 상태');
                     return;
                   }
                   handleSubmitCards();
                 }}
-                disabled={showCardDealAnimation || !isMyTurn()}
-                title={!isMyTurn() ? '다른 플레이어의 차례입니다' : '카드를 제출합니다'}
+                disabled={showCardDealAnimation || !isMyTurn() || isSubmitting}
+                title={!isMyTurn() ? '다른 플레이어의 차례입니다' : isSubmitting ? '제출 중입니다' : '카드를 제출합니다'}
               >
                 Submit
               </button>
