@@ -1115,18 +1115,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
                 >
                   {gameMode === 'easyMode' ? '초보모드' : '일반모드'}
                 </button>
-                <button 
-                  className="control-btn"
-                  onClick={() => {
-                    const room = ColyseusService.getRoom();
-                    if (room) {
-                      room.send("resetGame");
-                      console.log("게임 상태 초기화 요청");
-                    }
-                  }}
-                >
-                  게임 초기화
-                </button>
+
               </div>
             </div>
 

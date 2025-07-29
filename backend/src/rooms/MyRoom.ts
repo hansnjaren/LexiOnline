@@ -132,12 +132,7 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       this.broadcast("gameReset", {});
     });
 
-    // 게임 상태 강제 초기화 (디버깅용)
-    this.onMessage("resetGame", (client) => {
-      console.log(`[DEBUG] 게임 상태 강제 초기화 요청: ${client.sessionId}`);
-      this.resetGameState();
-      this.broadcast("gameReset", {});
-    });
+
 
     // ------------------------------------------------------------------- 프론트엔드 관련 추가 끝
 
