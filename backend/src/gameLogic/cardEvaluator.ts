@@ -17,6 +17,7 @@ export interface MadeEvalResult {
 export function parseCard(card: number, maxNumber: number) {
   const type = Math.floor(card / maxNumber);
   const number = (card + maxNumber - 2) % maxNumber;
+  console.log(`[DEBUG] 카드 파싱: card=${card}, maxNumber=${maxNumber}, type=${type}, number=${number}`);
   return { type, number };
 }
 
@@ -31,9 +32,15 @@ export function getValue(number: number, type: number, maxNumber: number): numbe
 }
 
 export function isStraightWithException(numbers: number[], maxNumber: number): boolean {
+  console.log(`[DEBUG] 스트레이트 검사: numbers=${numbers.join(', ')}, maxNumber=${maxNumber}`);
+  
   for (let i = 1; i < 5; ++i) {
-    if ((numbers[i] + maxNumber - numbers[i - 1]) % maxNumber !== 1) return false;
+    const diff = (numbers[i] + maxNumber - numbers[i - 1]) % maxNumber;
+    console.log(`[DEBUG] 연속성 검사: ${numbers[i-1]} -> ${numbers[i]}, diff=${diff}`);
+    if (diff !== 1) return false;
   }
+  
+  // 특별한 경우: A-2-3-4-5 스트레이트는 제외
   if (
     numbers[0] === maxNumber - 3 &&
     numbers[1] === maxNumber - 2 &&
@@ -41,8 +48,11 @@ export function isStraightWithException(numbers: number[], maxNumber: number): b
     numbers[3] === 0 &&
     numbers[4] === 1
   ) {
+    console.log(`[DEBUG] A-2-3-4-5 스트레이트 제외`);
     return false;
   }
+  
+  console.log(`[DEBUG] 스트레이트 확인됨`);
   return true;
 }
 
@@ -78,6 +88,10 @@ export function evaluateMade(cards: number[], maxNumber: number): MadeEvalResult
 
   const isFlush = typeCount.size === 1;
   const isStraight = isStraightWithException(numbers, maxNumber);
+  
+  console.log(`[DEBUG] 족보 판별: isFlush=${isFlush}, isStraight=${isStraight}, typeCount.size=${typeCount.size}`);
+  console.log(`[DEBUG] 숫자 분포:`, Array.from(numCount.entries()));
+  console.log(`[DEBUG] 색상 분포:`, Array.from(typeCount.entries()));
 
   let four = false, three = false, two = false;
   for (const count of numCount.values()) {

@@ -14,6 +14,7 @@ function AppContent() {
   const navigate = useNavigate();
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('lobby');
   const [playerCount, setPlayerCount] = useState<number>(5); // 기본값 5명
+  const [roundResult, setRoundResult] = useState<any>(null); // 라운드 결과 저장
 
   // URL 경로에 따라 화면 상태 설정
   useEffect(() => {
@@ -43,8 +44,11 @@ function AppContent() {
     }
   }, [location.pathname, navigate]);
 
-  const handleScreenChange = (screen: ScreenType) => {
+  const handleScreenChange = (screen: ScreenType, result?: any) => {
     setCurrentScreen(screen);
+    if (result) {
+      setRoundResult(result);
+    }
     // 화면 변경 시 URL도 업데이트
     switch (screen) {
       case 'waiting':
@@ -71,7 +75,7 @@ function AppContent() {
       case 'game':
         return <GameScreen onScreenChange={handleScreenChange} playerCount={playerCount} />;
       case 'result':
-        return <ResultScreen onScreenChange={handleScreenChange} playerCount={playerCount} />;
+        return <ResultScreen onScreenChange={handleScreenChange} playerCount={playerCount} roundResult={roundResult} />;
       default:
         return <LobbyScreen onScreenChange={handleScreenChange} />;
     }

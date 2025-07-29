@@ -13,7 +13,7 @@ import CardDealAnimation from './CardDealAnimation';
 import ColyseusService from '../../services/ColyseusService';
 
 interface GameScreenProps {
-  onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result') => void;
+  onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result', result?: any) => void;
   playerCount: number;
 }
 
@@ -256,6 +256,15 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       onScreenChange('result');
     });
 
+    room.onMessage('roundEnded', (message) => {
+      console.log('라운드 종료:', message);
+      // 라운드 결과 정보를 저장하고 결과 화면으로 이동
+      // message.scores: 각 플레이어의 점수 정보
+      // message.round: 종료된 라운드 번호
+      // message.isGameEnd: 게임 종료 여부
+      onScreenChange('result', message);
+    });
+
     room.onMessage('roundStart', (message) => {
       console.log('라운드 시작:', message);
       
@@ -408,8 +417,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       // 백엔드 상태로부터 모든 플레이어의 남은 카드 수 동기화
       syncPlayerRemainingCards();
       
-      // 선택된 카드들 모두 해제
-      setSelectedCards([]);
+      // 다른 유저가 pass했을 때는 내가 선택한 카드들의 선택 상태를 유지
+      // setSelectedCards([]); // 이 줄을 제거하여 선택 상태 유지
     });
 
     room.onMessage('cycleEnded', (message) => {
@@ -437,9 +446,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         currentTurnId: prev.currentTurnId + 1
       }));
       
-      // 선택된 카드들 모두 해제
-      setSelectedCards([]);
-      
       // 모든 플레이어 정보 업데이트
       if (message.allPlayers) {
         const updatedPlayers: Player[] = message.allPlayers.map((p: any) => ({
@@ -458,6 +464,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         const currentPlayer = updatedPlayers.find(p => p.isCurrentPlayer);
         const isMyTurn = currentPlayer && currentPlayer.sessionId === room.sessionId;
         console.log(`[DEBUG] 현재 턴: ${currentPlayer?.nickname || '알 수 없음'}, 내 턴인가?: ${isMyTurn}`);
+        
+        // 내 턴이 아닐 때는 선택된 카드들을 유지 (다른 유저가 pass했을 때)
+        // 내 턴일 때만 선택된 카드들을 해제
+        if (isMyTurn) {
+          setSelectedCards([]);
+        }
       }
     });
 
@@ -791,24 +803,75 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     const room = ColyseusService.getRoom();
     const maxNumber = room?.state?.maxNumber || 13;
     
-    // 같은 숫자인지 확인
-    const parsed = cardNumbers.map(card => parseCard(card, maxNumber));
-    const firstNumber = parsed[0].number;
-    if (!parsed.every(c => c.number === firstNumber)) {
-      return { canSubmit: false, reason: "같은 숫자의 카드만 제출할 수 있습니다" };
-    }
-
     // 현재 조합과 비교
     if (gameState.lastType !== 0 && cardNumbers.length !== gameState.lastType) {
       return { canSubmit: false, reason: "이전과 같은 개수의 카드를 제출해야 합니다" };
     }
 
-    // 순서 확인
-    const maxType = Math.max(...parsed.map(c => c.type));
-    const currentValue = firstNumber * maxNumber + maxType;
-    
-    if (currentValue <= gameState.lastHighestValue) {
-      return { canSubmit: false, reason: `순서가 낮습니다. 현재값: ${currentValue}, 이전값: ${gameState.lastHighestValue}` };
+    // 1-3장의 경우: 같은 숫자인지 확인
+    if (cardNumbers.length < 4) {
+      const parsed = cardNumbers.map(card => parseCard(card, maxNumber));
+      const firstNumber = parsed[0].number;
+      if (!parsed.every(c => c.number === firstNumber)) {
+        return { canSubmit: false, reason: "같은 숫자의 카드만 제출할 수 있습니다" };
+      }
+
+      // 순서 확인
+      const maxType = Math.max(...parsed.map(c => c.type));
+      const currentValue = firstNumber * maxNumber + maxType;
+      
+      if (currentValue <= gameState.lastHighestValue) {
+        return { canSubmit: false, reason: `순서가 낮습니다. 현재값: ${currentValue}, 이전값: ${gameState.lastHighestValue}` };
+      }
+    } else {
+      // 5장의 경우: 백엔드에서 evaluateMade로 검증하므로 여기서는 기본 검증만
+      // 실제 조합 검증은 백엔드에서 수행
+      const parsed = cardNumbers.map(card => parseCard(card, maxNumber));
+      const numbers = parsed.map(c => c.number).sort((a, b) => a - b);
+      const types = parsed.map(c => c.type);
+      
+      // 기본적인 스트레이트 플래시 검증
+      const isFlush = new Set(types).size === 1;
+      
+      // 백엔드와 동일한 스트레이트 검증 로직
+      let isStraight = true;
+      for (let i = 1; i < 5; ++i) {
+        if ((numbers[i] + maxNumber - numbers[i - 1]) % maxNumber !== 1) {
+          isStraight = false;
+          break;
+        }
+      }
+      
+      // A-2-3-4-5 스트레이트 예외 처리 (백엔드와 동일)
+      if (
+        numbers[0] === maxNumber - 3 &&
+        numbers[1] === maxNumber - 2 &&
+        numbers[2] === maxNumber - 1 &&
+        numbers[3] === 0 &&
+        numbers[4] === 1
+      ) {
+        isStraight = false;
+      }
+      
+      if (!isFlush || !isStraight) {
+        return { canSubmit: false, reason: "5장 카드는 유효한 조합이어야 합니다" };
+      }
+      
+      // 순서 확인 (가장 높은 카드 기준)
+      let bestIndex = -1, bestType = -1, bestNumber = -1;
+      for (let i = 0; i < numbers.length; i++) {
+        const idx = getOrderIndex(numbers[i], maxNumber);
+        if (idx > bestIndex || (idx === bestIndex && types[i] > bestType)) {
+          bestIndex = idx;
+          bestType = types[i];
+          bestNumber = numbers[i];
+        }
+      }
+      
+      const currentValue = getValue(bestNumber, bestType, maxNumber);
+      if (currentValue <= gameState.lastHighestValue) {
+        return { canSubmit: false, reason: `순서가 낮습니다. 현재값: ${currentValue}, 이전값: ${gameState.lastHighestValue}` };
+      }
     }
 
     return { canSubmit: true, reason: "제출 가능" };
@@ -1163,6 +1226,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       console.log('[DEBUG] handlePass - 자신의 차례가 아님, 함수 실행 중단');
       return;
     }
+    
+    // 내가 pass를 눌렀을 때는 선택된 카드들을 해제
+    setSelectedCards([]);
     
     const room = ColyseusService.getRoom();
     if (room) {

@@ -397,18 +397,34 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       player.score += diffScore; // 기존 점수에 차이만큼 가감
     }
 
-  // 변경된 점수 등을 클라이언트에 알림 원하면 broadcast 추가
-    this.broadcast("scoreUpdate", {
+    // 라운드 결과 정보를 클라이언트에 전송
+    const roundResult = {
       scores: Array.from(this.state.players.entries()).map(([id, p]) => ({
         playerId: id,
         score: p.score,
+        nickname: p.nickname || '익명',
+        scoreDiff: scoreDiffMap.get(id) || 0
       })),
       round: this.state.round,
-    });
+      isGameEnd: false
+    };
+
+    this.broadcast("roundEnded", roundResult);
+
     // 라운드 진행, 전체 라운드 종료 시 게임 종료
     this.state.round += 1;
-    if(this.state.round > this.state.totalRounds) this.endGame();
-    else this.startRound();
+    if(this.state.round > this.state.totalRounds) {
+      // 게임 종료 시 최종 결과 전송
+      const finalResult = {
+        ...roundResult,
+        round: this.state.round - 1, // 마지막 라운드 번호
+        isGameEnd: true
+      };
+      this.broadcast("gameEnded", finalResult);
+      this.endGame();
+    } else {
+      this.startRound();
+    }
   }
 
   endGame() {

@@ -7,6 +7,18 @@ import ColyseusService from '../../services/ColyseusService';
 interface ResultScreenProps {
   onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result') => void;
   playerCount: number;
+  roundResult?: any;
+}
+
+interface RoundResult {
+  scores: Array<{
+    playerId: string;
+    score: number;
+    nickname: string;
+    scoreDiff: number;
+  }>;
+  round: number;
+  isGameEnd: boolean;
 }
 
 // AnimatedArrow 컴포넌트: SVG 화살표 + 애니메이션
@@ -87,11 +99,14 @@ const AnimatedArrow: React.FC<{
   );
 };
 
-const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount }) => {
+const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount, roundResult: initialRoundResult }) => {
   const [transferMessage, setTransferMessage] = useState('');
   const [currentTransferStep, setCurrentTransferStep] = useState(0);
   const [showArrow, setShowArrow] = useState(false);
   const [showButtons, setShowButtons] = useState(true);
+  const [roundResult, setRoundResult] = useState<RoundResult | null>(initialRoundResult || null);
+  const [actualPlayerCount, setActualPlayerCount] = useState(playerCount);
+  const [isLayoutReady, setIsLayoutReady] = useState(false);
 
   // 각 타일카운트 원의 ref를 개별적으로 생성
   const player0Ref = useRef<HTMLDivElement>(null);
@@ -115,7 +130,7 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
   useEffect(() => {
     const newCenters: { [key: string]: { x: number; y: number } | null } = {};
     
-    for (let i = 0; i < playerCount; i++) {
+    for (let i = 0; i < actualPlayerCount; i++) {
       const key = `player${i}`;
       const tile = tileRefs[key]?.current;
       const layout = layoutRef.current;
@@ -132,7 +147,66 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
     }
     
     setCenters(newCenters);
-  }, [showArrow, currentTransferStep, playerCount]);
+    
+    // 모든 요소가 렌더링되었는지 확인
+    const allElementsReady = Object.values(newCenters).every(center => center !== null);
+    if (allElementsReady && !isLayoutReady) {
+      setIsLayoutReady(true);
+    }
+  }, [showArrow, currentTransferStep, actualPlayerCount, isLayoutReady]);
+
+  useEffect(() => {
+    // Colyseus 서비스에서 라운드 결과 정보 가져오기
+    const room = ColyseusService.getRoom();
+    if (room) {
+      // 실제 플레이어 수 가져오기
+      const playerCount = room.state.players.size;
+      setActualPlayerCount(playerCount);
+      console.log('실제 플레이어 수:', playerCount);
+
+      // 라운드 결과 메시지 수신
+      const handleRoundEnded = (message: RoundResult) => {
+        console.log('라운드 결과 수신:', message);
+        console.log('scores 배열:', message.scores);
+        console.log('scores 길이:', message.scores?.length);
+        setRoundResult(message);
+      };
+
+      room.onMessage('roundEnded', handleRoundEnded);
+      room.onMessage('gameEnded', handleRoundEnded);
+
+      // 기존에 이미 결과가 있는지 확인
+      console.log('현재 room.state:', room.state);
+      console.log('현재 플레이어들:', Array.from(room.state.players.entries()));
+      
+      // 이미 게임이 끝난 상태라면 현재 플레이어 정보로 결과 구성
+      const currentPlayers = Array.from(room.state.players.entries()) as [string, any][];
+      if (currentPlayers.length > 0) {
+        const scores = currentPlayers.map(([id, p]) => ({
+          playerId: id,
+          score: p.hand ? p.hand.length : 0, // 남은 카드 수
+          nickname: p.nickname || '익명',
+          scoreDiff: 0
+        }));
+        
+        // 점수 순으로 정렬 (낮은 점수가 높은 순위)
+        scores.sort((a, b) => a.score - b.score);
+        
+        const currentResult: RoundResult = {
+          scores,
+          round: room.state.round || 1,
+          isGameEnd: true
+        };
+        
+        console.log('현재 상태로 결과 구성:', currentResult);
+        setRoundResult(currentResult);
+      }
+
+      return () => {
+        // cleanup 함수는 비워둠 (리스너가 자동으로 정리됨)
+      };
+    }
+  }, []);
 
   useEffect(() => {
     // 참가자 인원수에 따라 메시지 배열 동적 생성
@@ -150,31 +224,54 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
       return steps;
     };
     
-    const steps = generateSteps(playerCount);
+    const steps = generateSteps(actualPlayerCount);
     let currentStep = 0;
     setTransferMessage(steps[0]);
     setCurrentTransferStep(0);
-    setShowArrow(true);
     setShowButtons(false); // 애니메이션 시작 시 버튼 숨김
-    const timer = setInterval(() => {
-      if (currentStep < steps.length - 1) {
-        currentStep++;
-        setTransferMessage(steps[currentStep]);
-        setCurrentTransferStep(currentStep);
-        setShowArrow(true);
-      } else {
-        setShowArrow(false);
-        clearInterval(timer);
-        
-        // "결과 집계 완료!" 메시지가 표시된 후 2초 뒤에 버튼 표시
-        setTimeout(() => {
-          setTransferMessage('');
-          setShowButtons(true);
-        }, 2000);
-      }
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [playerCount]);
+    
+    // 요소들이 완전히 렌더링된 후 애니메이션 시작
+    const startAnimation = () => {
+      setShowArrow(true);
+      const timer = setInterval(() => {
+        if (currentStep < steps.length - 1) {
+          currentStep++;
+          setTransferMessage(steps[currentStep]);
+          setCurrentTransferStep(currentStep);
+          setShowArrow(true);
+        } else {
+          setShowArrow(false);
+          clearInterval(timer);
+          
+          // "결과 집계 완료!" 메시지가 표시된 후 2초 뒤에 버튼 표시
+          setTimeout(() => {
+            setTransferMessage('');
+            setShowButtons(true);
+          }, 2000);
+        }
+      }, 4000);
+      return timer;
+    };
+    
+    // 레이아웃이 준비된 후에만 애니메이션 시작
+    if (isLayoutReady) {
+      const timer = setTimeout(() => {
+        startAnimation();
+      }, 100);
+      
+      return () => {
+        clearTimeout(timer);
+      };
+    }
+  }, [actualPlayerCount, isLayoutReady]);
+
+  // roundResult 변경 감지
+  useEffect(() => {
+    console.log('roundResult 변경됨:', roundResult);
+    if (roundResult?.scores) {
+      console.log('scores 상세:', roundResult.scores);
+    }
+  }, [roundResult]);
 
   const handlePlayAgain = () => {
     console.log('다시하기');
@@ -196,22 +293,38 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
       <div className="result-container">
         {/* 상단 섹션 - 상대방 정보 */}
         <div className="opponent-section">
-          <div className={`circular-layout players-${playerCount}`} ref={layoutRef}>
+          <div className={`circular-layout players-${actualPlayerCount}`} ref={layoutRef}>
             {/* 플레이어 박스들을 동적으로 생성 */}
-            {Array.from({ length: playerCount }, (_, index) => {
+            {roundResult?.scores.map((player, index) => {
               const rank = index + 1;
-              const tileCounts = [0, 2, 10, 5, 8]; // 예시 데이터
-              const tileCount = tileCounts[index] || 0;
-              const rankColors = ['gold', 'silver', 'bronze', 'black', 'black'];
+              const tileCount = player.score; // score가 남은 카드 수
+              const rankColors = ['gold', 'silver', 'bronze', 'black', 'gray'];
+              const rankColor = rankColors[index] || 'gray';
+              
+              return (
+                <div key={index} className="player-box">
+                  <div className="player-placeholder">{player.nickname}</div>
+                  <div className="tiles-info">
+                    <span className="remaining-count">{tileCount}장</span>
+                    <div className={`tile-count ${rankColor}`} ref={tileRefs[`player${index}` as keyof typeof tileRefs]}>
+                      {tileCount}
+                    </div>
+                  </div>
+                </div>
+              );
+            }) || Array.from({ length: actualPlayerCount }, (_, index) => {
+              // roundResult가 없을 때는 기본 플레이어 박스 표시
+              const rank = index + 1;
+              const rankColors = ['gold', 'silver', 'bronze', 'black', 'gray'];
               const rankColor = rankColors[index] || 'gray';
               
               return (
                 <div key={index} className="player-box">
                   <div className="player-placeholder">닉네임</div>
                   <div className="tiles-info">
-                    <span className="remaining-count">{tileCount}장</span>
+                    <span className="remaining-count">0장</span>
                     <div className={`tile-count ${rankColor}`} ref={tileRefs[`player${index}` as keyof typeof tileRefs]}>
-                      {tileCount}
+                      0
                     </div>
                   </div>
                 </div>
@@ -221,37 +334,37 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
             {showArrow && (
               <>
                 {/* 플레이어 수에 따른 화살표 애니메이션 */}
-                {currentTransferStep === 0 && playerCount >= 2 && (
+                {currentTransferStep === 0 && actualPlayerCount >= 2 && (
                   <AnimatedArrow from={centers.player1} to={centers.player0} visible={true} />
                 )}
-                {currentTransferStep === 0 && playerCount >= 3 && (
+                {currentTransferStep === 0 && actualPlayerCount >= 3 && (
                   <AnimatedArrow from={centers.player2} to={centers.player0} visible={true} />
                 )}
-                {currentTransferStep === 0 && playerCount >= 4 && (
+                {currentTransferStep === 0 && actualPlayerCount >= 4 && (
                   <AnimatedArrow from={centers.player3} to={centers.player0} visible={true} />
                 )}
-                {currentTransferStep === 0 && playerCount >= 5 && (
+                {currentTransferStep === 0 && actualPlayerCount >= 5 && (
                   <AnimatedArrow from={centers.player4} to={centers.player0} visible={true} />
                 )}
                 
-                {currentTransferStep === 1 && playerCount >= 3 && (
+                {currentTransferStep === 1 && actualPlayerCount >= 3 && (
                   <AnimatedArrow from={centers.player2} to={centers.player1} visible={true} />
                 )}
-                {currentTransferStep === 1 && playerCount >= 4 && (
+                {currentTransferStep === 1 && actualPlayerCount >= 4 && (
                   <AnimatedArrow from={centers.player3} to={centers.player1} visible={true} />
                 )}
-                {currentTransferStep === 1 && playerCount >= 5 && (
+                {currentTransferStep === 1 && actualPlayerCount >= 5 && (
                   <AnimatedArrow from={centers.player4} to={centers.player1} visible={true} />
                 )}
                 
-                {currentTransferStep === 2 && playerCount >= 4 && (
+                {currentTransferStep === 2 && actualPlayerCount >= 4 && (
                   <AnimatedArrow from={centers.player3} to={centers.player2} visible={true} />
                 )}
-                {currentTransferStep === 2 && playerCount >= 5 && (
+                {currentTransferStep === 2 && actualPlayerCount >= 5 && (
                   <AnimatedArrow from={centers.player4} to={centers.player2} visible={true} />
                 )}
                 
-                {currentTransferStep === 3 && playerCount >= 5 && (
+                {currentTransferStep === 3 && actualPlayerCount >= 5 && (
                   <AnimatedArrow from={centers.player4} to={centers.player3} visible={true} />
                 )}
               </>

@@ -286,9 +286,17 @@
   color: white;
 }
 
+/*
 .tile-count.gray {
   border-color: #666;
   background-color: #999;
+  color: white;
+}
+  */
+
+.tile-count.gray {
+  border-color: #333;
+  background-color: #333;
   color: white;
 }
 

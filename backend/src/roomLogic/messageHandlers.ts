@@ -82,7 +82,9 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
     room.state.lastHighestValue = result.value;
     room.state.lastMadeType = MADE_NONE;
   } else {
+    console.log(`[DEBUG] 5장 카드 평가: cards=${submitCards.join(', ')}, maxNumber=${room.state.maxNumber}`);
     result = evaluateMade(submitCards, room.state.maxNumber);
+    console.log(`[DEBUG] 평가 결과: type=${result.type}, value=${result.value}, valid=${result.valid}`);
     if (!result.valid) {
       client.send("submitRejected", { reason: "Wrong cards: not made cards." });
       return;
