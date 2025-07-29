@@ -35,6 +35,8 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       const newRounds = data.rounds;
       if (typeof newRounds === "number" && newRounds > 0) {
         this.state.totalRounds = newRounds;
+        // 모든 클라이언트에게 라운드 수 변경 알림
+        this.broadcast("totalRoundsUpdated", { totalRounds: newRounds });
       } else {
         client.send("changeRejected", { reason: "Invalid round count." });
       }
@@ -122,8 +124,49 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
         playerOrder: this.state.playerOrder.slice(),
         isGameStarted: this.state.round > 0,
         myHand: myHand,
-        maxNumber: this.state.maxNumber
+        maxNumber: this.state.maxNumber,
+        round: this.state.round,
+        totalRounds: this.state.totalRounds
       });
+    });
+
+    // 다음 라운드 시작 요청
+    this.onMessage("startNextRound", (client) => {
+      console.log(`플레이어 ${client.sessionId}가 다음 라운드 시작을 요청함`);
+      
+      // 현재 라운드가 마지막 라운드인지 확인
+      if (this.state.round >= this.state.totalRounds) {
+        client.send("nextRoundRejected", { reason: "이미 마지막 라운드입니다." });
+        return;
+      }
+      
+      // 다음 라운드로 진행
+      this.state.round++;
+      this.startRound();
+    });
+
+    // 플레이어가 다음 라운드 준비 완료 신호
+    this.onMessage("readyForNextRound", (client) => {
+      const player = this.state.players.get(client.sessionId);
+      if (player) {
+        player.readyForNextRound = true;
+        console.log(`플레이어 ${client.sessionId}가 다음 라운드 준비 완료`);
+        
+        // 모든 플레이어에게 준비 상태 업데이트 알림
+        this.broadcast("readyForNextRound", {
+          playerId: client.sessionId,
+          ready: true
+        });
+        
+        // 모든 플레이어가 준비되었는지 확인
+        const allReady = Array.from(this.state.players.values()).every(p => p.readyForNextRound);
+        if (allReady) {
+          console.log("모든 플레이어가 다음 라운드 준비 완료");
+          this.broadcast("allPlayersReadyForNextRound");
+          // 다음 라운드 시작
+          this.startRound();
+        }
+      }
     });
 
     this.onMessage("playAgain", (client) => {
@@ -446,6 +489,11 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
 
     this.broadcast("roundEnded", roundResult);
 
+    // 다음 라운드 준비 상태 초기화
+    for (const player of this.state.players.values()) {
+      player.readyForNextRound = false;
+    }
+
     // 라운드 진행, 전체 라운드 종료 시 게임 종료
     this.state.round += 1;
     if(this.state.round > this.state.totalRounds) {
@@ -458,7 +506,10 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       this.broadcast("gameEnded", finalResult);
       this.endGame();
     } else {
-      this.startRound();
+      // 첫 번째 라운드가 아닐 때만 다음 라운드 대기 상태 시작
+      if (this.state.round > 1) {
+        this.broadcast("waitingForNextRound");
+      }
     }
   }
 

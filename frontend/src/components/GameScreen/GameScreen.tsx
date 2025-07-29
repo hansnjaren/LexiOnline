@@ -110,6 +110,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   }>>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 다음 라운드 대기 상태
+  const [waitingForNextRound, setWaitingForNextRound] = useState(false);
+  const [readyPlayers, setReadyPlayers] = useState<Set<string>>(new Set());
   
   // 게임 상태 (lastType, lastMadeType 등)
   const [gameState, setGameState] = useState<{
@@ -118,12 +121,16 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     lastHighestValue: number;
     currentTurnId: number; // 현재 턴 ID
     maxNumber: number; // 백엔드에서 받은 maxNumber
+    round: number; // 현재 라운드
+    totalRounds: number; // 전체 라운드 수
   }>({
     lastType: 0,
     lastMadeType: 0,
     lastHighestValue: -1,
     currentTurnId: 0,
-    maxNumber: 13 // 최초 진입시만 임시, 이후엔 항상 백엔드 값으로 갱신
+    maxNumber: 13, // 최초 진입시만 임시, 이후엔 항상 백엔드 값으로 갱신
+    round: 1,
+    totalRounds: 5
   });
   
   // 플레이어 정보 (백엔드에서 동적으로 가져옴)
@@ -150,6 +157,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
 
     // 게임 화면 진입 시 즉시 플레이어 정보 요청
     room.send("requestPlayerInfo");
+
+    // 게임 화면에 진입했을 때 다음 라운드 대기 상태인지 확인 (round가 2 이상일 때만)
+    if (room.state.round > 1 && !room.state.players.get(room.sessionId)?.readyForNextRound) {
+      setWaitingForNextRound(true);
+    }
 
     // 게임 상태 구독
     room.onStateChange((state) => {
@@ -186,7 +198,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
           lastMadeType: state.lastMadeType || 0,
           lastHighestValue: state.lastHighestValue || -1,
           currentTurnId: gameState.currentTurnId,
-          maxNumber: state.maxNumber || 13
+          maxNumber: state.maxNumber || 13,
+          round: state.round || 1,
+          totalRounds: state.totalRounds || 5
         });
         
         // 게임이 이미 시작되었고 손패가 있다면 손패만 업데이트 (애니메이션 없이)
@@ -273,6 +287,28 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       setPendingCards([]);
       
       onScreenChange('result', message);
+    });
+
+    // 다음 라운드 준비 완료 신호 수신
+    room.onMessage('readyForNextRound', (message) => {
+      console.log('플레이어가 다음 라운드 준비 완료:', message);
+      const newReadyPlayers = new Set(readyPlayers);
+      newReadyPlayers.add(message.playerId);
+      setReadyPlayers(newReadyPlayers);
+    });
+
+    // 모든 플레이어가 다음 라운드 준비 완료
+    room.onMessage('allPlayersReadyForNextRound', () => {
+      console.log('모든 플레이어가 다음 라운드 준비 완료');
+      setWaitingForNextRound(false);
+      setReadyPlayers(new Set());
+    });
+
+    // 다음 라운드 대기 상태 시작
+    room.onMessage('waitingForNextRound', () => {
+      console.log('다음 라운드 대기 상태 시작');
+      setWaitingForNextRound(true);
+      setReadyPlayers(new Set());
     });
 
     room.onMessage('roundStart', (message) => {
@@ -418,7 +454,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
           lastMadeType: currentRoom.state.lastMadeType || 0,
           lastHighestValue: currentRoom.state.lastHighestValue || -1,
           currentTurnId: gameState.currentTurnId,
-          maxNumber: currentRoom.state.maxNumber || 13
+          maxNumber: currentRoom.state.maxNumber || 13,
+          round: currentRoom.state.round || 1,
+          totalRounds: currentRoom.state.totalRounds || 5
         });
       }
       
@@ -467,7 +505,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         lastMadeType: 0,
         lastHighestValue: -1,
         currentTurnId: gameState.currentTurnId + 1, // 새로운 턴 시작
-        maxNumber: gameState.maxNumber // maxNumber는 유지
+        maxNumber: gameState.maxNumber, // maxNumber는 유지
+        round: gameState.round,
+        totalRounds: gameState.totalRounds
       });
       
       // 게임 보드는 그대로 유지 (패들이 사라지지 않도록)
@@ -872,10 +912,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     }
   }, [myHand, showCardDealAnimation]);
 
-  const handleGameEnd = () => {
-    console.log('게임 종료');
-    onScreenChange('result');
-  };
+
 
   const handleCardDealComplete = () => {
     setShowCardDealAnimation(false);
@@ -1528,8 +1565,39 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
           gameMode={gameMode as 'easyMode' | 'normal'}
         />
       )}
+
+      {/* 다음 라운드 대기 팝업 */}
+      {waitingForNextRound && (
+        <div className="waiting-popup-overlay">
+          <div className="waiting-popup">
+            <div className="waiting-spinner"></div>
+            <h3>다른 유저들을 기다리는 중입니다...</h3>
+            <p>모든 플레이어가 준비되면 다음 라운드가 시작됩니다.</p>
+            <div className="ready-players">
+              <p>준비 완료: {readyPlayers.size} / {players.length}명</p>
+              <div className="ready-list">
+                {players.map(player => (
+                  <span 
+                    key={player.sessionId} 
+                    className={`ready-indicator ${readyPlayers.has(player.sessionId) ? 'ready' : 'waiting'}`}
+                  >
+                    {player.nickname}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="game-container">
+        {/* 상단 - 라운드 정보 */}
+        <div className="round-info">
+          <span className="round-text">
+            라운드 {gameState.round} / {ColyseusService.getRoom()?.state?.totalRounds || gameState.totalRounds}
+          </span>
+        </div>
+        
         {/* 상단 좌측 - 다른 플레이어 정보 */}
         <div className="top-left-section">
           <div className="other-players">
@@ -1786,13 +1854,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
           </div>
         </div>
 
-        {/* 테스트용 게임 종료 버튼 */}
-        <button 
-          className="test-end-btn" 
-          onClick={handleGameEnd}
-        >
-          게임 종료 (테스트)
-        </button>
+
       </div>
       
       {/* 족보 가이드 모달 */}

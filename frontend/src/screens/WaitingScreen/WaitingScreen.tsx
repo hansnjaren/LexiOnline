@@ -241,6 +241,11 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
       setRounds(message.rounds);
     });
 
+    room.onMessage('totalRoundsUpdated', (message: any) => {
+      console.log('전체 라운드 수 업데이트:', message);
+      setRounds(message.totalRounds);
+    });
+
     room.onMessage('changeRejected', (message: any) => {
       console.error('라운드 수 변경 거부:', message.reason);
       alert('라운드 수 변경이 거부되었습니다: ' + message.reason);

@@ -265,9 +265,11 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
     console.log('다시하기');
     const room = ColyseusService.getRoom();
     if (room) {
-      room.send('playAgain', {});
+      // 다음 라운드 준비 완료 신호 전송
+      room.send('readyForNextRound', {});
+      // 게임 화면으로 이동
+      onScreenChange('game');
     }
-    onScreenChange('waiting');
   };
 
   const handleBackToLobby = () => {
