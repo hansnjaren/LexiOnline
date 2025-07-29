@@ -226,6 +226,17 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       isHost: this.state.host === client.sessionId
     });
 
+    // 대기화면 멤버 목록 동기화
+    // 모든 클라이언트에게 업데이트된 플레이어 목록 전송
+    this.broadcast("playersUpdated", {
+      players: Array.from(this.state.players.entries()).map(([id, p]) => ({
+        playerId: id,
+        nickname: p.nickname || '익명',
+        isReady: p.ready || false,
+        isHost: this.state.host === id
+      }))
+    });
+
     console.log(`플레이어 ${client.sessionId} 입장. 현재 플레이어 수: ${this.state.players.size}`);
   }
 
@@ -246,6 +257,16 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     this.broadcast("playerLeft", {
       playerId: client.sessionId,
       newHost: wasHost ? this.state.host : null
+    });
+
+    // 모든 클라이언트에게 업데이트된 플레이어 목록 전송
+    this.broadcast("playersUpdated", {
+      players: Array.from(this.state.players.entries()).map(([id, p]) => ({
+        playerId: id,
+        nickname: p.nickname || '익명',
+        isReady: p.ready || false,
+        isHost: this.state.host === id
+      }))
     });
 
     console.log(`플레이어 ${client.sessionId} 퇴장. 현재 플레이어 수: ${this.state.players.size}`);

@@ -127,26 +127,176 @@
   justify-content: center;
   align-items: center;
   gap: 1.2vw;
+  position: relative;
 }
 
 .rounds-setting label {
-  font-weight: bold;
+  font-weight: 600;
   color: #333;
-  font-size: 1.3vw;
+  font-size: 1.1vw;
+  letter-spacing: 0.05vw;
 }
 
 .rounds-setting select {
-  padding: 0.6vw 1vw;
-  border: 0.15vw solid #ddd;
-  border-radius: 0.5vw;
-  font-size: 1.3vw;
-  background-color: white;
+  padding: 0.8vw 1.2vw;
+  border: 0.12vw solid #e1e5e9;
+  border-radius: 0.8vw;
+  font-size: 0.95vw;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
   cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 0.2vw 0.8vw rgba(0, 0, 0, 0.1);
+  min-width: 8vw;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.8vw center;
+  background-size: 1vw;
+  padding-right: 2.5vw;
+}
+
+.rounds-setting select:hover {
+  border-color: #667eea;
+  box-shadow: 0 0.3vw 1.2vw rgba(102, 126, 234, 0.2);
+  transform: translateY(-0.1vw);
 }
 
 .rounds-setting select:focus {
   outline: none;
   border-color: #667eea;
+  box-shadow: 0 0 0 0.2vw rgba(102, 126, 234, 0.3);
+}
+
+.rounds-setting select option {
+  font-size: 0.9vw;
+  padding: 0.8vw;
+  background-color: #ffffff;
+  color: #333;
+  border: none;
+  font-weight: 500;
+}
+
+/* 브라우저 호환성을 위한 추가 스타일 */
+.rounds-setting select {
+  /* Firefox */
+  -moz-appearance: none;
+  /* Safari and Chrome */
+  -webkit-appearance: none;
+  /* IE */
+  -ms-appearance: none;
+}
+
+/* Webkit 브라우저용 추가 스타일 */
+.rounds-setting select::-ms-expand {
+  display: none;
+}
+
+.rounds-setting select::-webkit-select-placeholder {
+  color: #999;
+}
+
+/* 커스텀 드롭다운 스타일 */
+.custom-dropdown {
+  position: relative;
+  min-width: 8vw;
+  user-select: none;
+}
+
+.custom-dropdown.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8vw 1.2vw;
+  border: 0.12vw solid #e1e5e9;
+  border-radius: 0.8vw;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 0.2vw 0.8vw rgba(0, 0, 0, 0.1);
+  font-size: 0.95vw;
+  font-weight: 500;
+  color: #333;
+}
+
+.dropdown-header:hover {
+  border-color: #667eea;
+  box-shadow: 0 0.3vw 1.2vw rgba(102, 126, 234, 0.2);
+  transform: translateY(-0.1vw);
+}
+
+.dropdown-arrow {
+  width: 0;
+  height: 0;
+  border-left: 0.4vw solid transparent;
+  border-right: 0.4vw solid transparent;
+  border-top: 0.4vw solid #666;
+  transition: transform 0.3s ease;
+  margin-left: 0.5vw;
+}
+
+.custom-dropdown.open .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.dropdown-options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 0.12vw solid #e1e5e9;
+  border-top: none;
+  border-radius: 0 0 0.8vw 0.8vw;
+  box-shadow: 0 0.4vw 1.6vw rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  max-height: 15vw;
+  overflow-y: auto;
+  animation: dropdownSlide 0.3s ease;
+}
+
+@keyframes dropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5vw);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-option {
+  padding: 0.8vw 1.2vw;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9vw;
+  font-weight: 500;
+  color: #333;
+  border-bottom: 0.05vw solid #f0f0f0;
+}
+
+.dropdown-option:last-child {
+  border-bottom: none;
+}
+
+.dropdown-option:hover {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.dropdown-option.selected {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+}
+
+.dropdown-option.selected:hover {
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
 }
 
 .player-count-setting {
@@ -240,6 +390,24 @@
     font-size: clamp(0.8vw, 2.5vw, 1.2vw);
   }
   
+  .rounds-setting label {
+    font-size: clamp(1.2vw, 3vw, 1.6vw);
+  }
+  
+  .custom-dropdown {
+    min-width: 12vw;
+  }
+  
+  .dropdown-header {
+    font-size: clamp(1vw, 2.5vw, 1.4vw);
+    padding: 1vw 1.5vw;
+  }
+  
+  .dropdown-option {
+    font-size: clamp(0.9vw, 2.2vw, 1.3vw);
+    padding: 1vw 1.5vw;
+  }
+  
   .btn {
     font-size: clamp(1.2vw, 3vw, 1.6vw);
     padding: 1.2vw 2.5vw;
@@ -263,6 +431,24 @@
   
   .status {
     font-size: clamp(1vw, 3vw, 1.4vw);
+  }
+  
+  .rounds-setting label {
+    font-size: clamp(1.4vw, 3.5vw, 1.8vw);
+  }
+  
+  .custom-dropdown {
+    min-width: 15vw;
+  }
+  
+  .dropdown-header {
+    font-size: clamp(1.2vw, 3vw, 1.6vw);
+    padding: 1.2vw 1.8vw;
+  }
+  
+  .dropdown-option {
+    font-size: clamp(1.1vw, 2.8vw, 1.5vw);
+    padding: 1.2vw 1.8vw;
   }
   
   .btn {

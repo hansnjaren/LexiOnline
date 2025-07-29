@@ -16,6 +16,69 @@ interface WaitingScreenProps {
   setPlayerCount: (count: number) => void;
 }
 
+// 커스텀 드롭다운 컴포넌트
+const CustomDropdown: React.FC<{
+  value: number;
+  onChange: (value: number) => void;
+  options: { value: number; label: string }[];
+  disabled?: boolean;
+}> = ({ value, onChange, options, disabled = false }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  const handleSelect = (optionValue: number) => {
+    onChange(optionValue);
+    setIsOpen(false);
+  };
+
+  const selectedOption = options.find(option => option.value === value);
+
+  // 외부 클릭 시 드롭다운 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  return (
+    <div 
+      ref={dropdownRef}
+      className={`custom-dropdown ${isOpen ? 'open' : ''} ${disabled ? 'disabled' : ''}`}
+    >
+      <div 
+        className="dropdown-header" 
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+      >
+        <span>{selectedOption?.label}</span>
+        <div className="dropdown-arrow"></div>
+      </div>
+      {isOpen && (
+        <div className="dropdown-options">
+          {options.map((option) => (
+            <div
+              key={option.value}
+              className={`dropdown-option ${option.value === value ? 'selected' : ''}`}
+              onClick={() => handleSelect(option.value)}
+            >
+              {option.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCount, setPlayerCount }) => {
   const navigate = useNavigate();
   const [players, setPlayers] = useState<Player[]>([]);
@@ -242,6 +305,23 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
       }
     });
 
+    room.onMessage('playersUpdated', (message: any) => {
+      console.log('플레이어 목록 업데이트:', message);
+      // 전체 플레이어 목록을 서버에서 받은 정보로 업데이트
+      const updatedPlayers: Player[] = message.players.map((p: any) => ({
+        id: p.playerId,
+        nickname: p.nickname,
+        isReady: p.isReady
+      }));
+      setPlayers(updatedPlayers);
+      
+      // 호스트 정보도 업데이트
+      const currentPlayer = message.players.find((p: any) => p.playerId === room.sessionId);
+      if (currentPlayer) {
+        setIsHost(currentPlayer.isHost);
+      }
+    });
+
     // 방에서 나갈 때 정리
     return () => {
       room.onLeave(() => {
@@ -341,25 +421,24 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
             <h2>게임 설정</h2>
             <div className="rounds-setting">
               <label htmlFor="rounds">라운드 수:</label>
-              <select 
-                id="rounds" 
-                value={rounds} 
-                onChange={(e) => {
-                  const newRounds = Number(e.target.value);
-                  setRounds(newRounds);
+              <CustomDropdown
+                value={rounds}
+                onChange={(value) => {
+                  setRounds(value);
                   // 서버에 라운드 수 변경 요청
                   const room = ColyseusService.getRoom();
                   if (room) {
-                    room.send('changeRounds', { rounds: newRounds });
+                    room.send('changeRounds', { rounds: value });
                   }
                 }}
-              >
-                <option value={1}>1라운드</option>
-                <option value={2}>2라운드</option>
-                <option value={3}>3라운드</option>
-                <option value={4}>4라운드</option>
-                <option value={5}>5라운드</option>
-              </select>
+                options={[
+                  { value: 1, label: '1라운드' },
+                  { value: 2, label: '2라운드' },
+                  { value: 3, label: '3라운드' },
+                  { value: 4, label: '4라운드' },
+                  { value: 5, label: '5라운드' },
+                ]}
+              />
             </div>
           </div>
         )}
