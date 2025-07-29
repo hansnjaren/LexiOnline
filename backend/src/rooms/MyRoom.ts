@@ -312,7 +312,7 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     // 6) 기타 상태 초기화
     this.state.lastType = 0;
     this.state.lastMadeType = MADE_NONE;
-    this.state.lastHighestValue = 0;
+    this.state.lastHighestValue = -1;
     this.state.lastCards = new ArraySchema<number>();
     this.state.lastPlayerIndex = -1;
 
@@ -365,7 +365,7 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     if(this.state.nowPlayerIndex === this.state.lastPlayerIndex) {
       this.state.lastType = 0;
       this.state.lastMadeType = MADE_NONE;
-      this.state.lastHighestValue = 0;
+      this.state.lastHighestValue = -1;
       this.state.lastCards = new ArraySchema<number>();
       this.broadcast("cycleEnded", {});
     }
@@ -432,7 +432,7 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     this.state.round = 0;
     this.state.lastType = 0;
     this.state.lastMadeType = MADE_NONE;
-    this.state.lastHighestValue = 0;
+    this.state.lastHighestValue = -1;
     this.state.lastCards = new ArraySchema<number>();
     this.state.lastPlayerIndex = -1;
     this.state.nowPlayerIndex = 0;

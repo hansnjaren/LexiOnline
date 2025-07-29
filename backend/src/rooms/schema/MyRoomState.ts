@@ -8,7 +8,7 @@ export class MyRoomState extends Schema {
 
   @type("int8") lastPlayerIndex = 0;
 
-  @type("int8") lastHighestValue = 0; // order decision
+  @type("int8") lastHighestValue = -1; // order decision
 
   @type("int8") lastType = 0; // 0: starting, 1: single, 2: pair, 3: triple, 5: made
 

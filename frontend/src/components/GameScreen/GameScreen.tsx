@@ -115,7 +115,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   }>({
     lastType: 0,
     lastMadeType: 0,
-    lastHighestValue: 0
+    lastHighestValue: -1
   });
   
   // 플레이어 정보 (백엔드에서 동적으로 가져옴)
@@ -175,16 +175,18 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         setGameState({
           lastType: state.lastType || 0,
           lastMadeType: state.lastMadeType || 0,
-          lastHighestValue: state.lastHighestValue || 0
+          lastHighestValue: state.lastHighestValue || -1
         });
         
         // 게임이 이미 시작되었고 손패가 있다면 손패만 업데이트 (애니메이션 없이)
         const myPlayer = state.players.get(room.sessionId);
         if (myPlayer && myPlayer.hand && myPlayer.hand.length > 0 && !showCardDealAnimation) {
           console.log('이미 라운드가 시작됨, 손패만 업데이트 (애니메이션 없이)');
+          const maxNumber = state.maxNumber || 13;
+          console.log('[DEBUG] state.maxNumber:', state.maxNumber);
           const handCards = myPlayer.hand.map((cardNumber: number, index: number) => {
-            const color = getCardColorFromNumber(cardNumber);
-            const value = getCardValueFromNumber(cardNumber);
+            const color = getCardColorFromNumber(cardNumber, maxNumber);
+            const value = getCardValueFromNumber(cardNumber, maxNumber);
             return {
               id: index,
               value: value,
@@ -220,9 +222,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       // 게임이 이미 시작되었고 손패가 있다면 손패만 업데이트 (애니메이션 없이)
       if (message.isGameStarted && message.myHand && message.myHand.length > 0) {
         console.log('게임이 이미 시작됨, 손패 정보로 손패만 업데이트 (애니메이션 없이)');
+        const maxNumber = message.maxNumber || 13;
+        console.log('[DEBUG] message.maxNumber:', message.maxNumber);
         const handCards = message.myHand.map((cardNumber: number, index: number) => {
-          const color = getCardColorFromNumber(cardNumber);
-          const value = getCardValueFromNumber(cardNumber);
+          const color = getCardColorFromNumber(cardNumber, maxNumber);
+          const value = getCardValueFromNumber(cardNumber, maxNumber);
           return {
             id: index,
             value: value,
@@ -249,10 +253,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       
       // 내 손패 설정
       if (message.hand) {
+        const maxNumber = message.maxNumber || 13;
+        console.log('[DEBUG] roundStart message.maxNumber:', message.maxNumber);
         const handCards = message.hand.map((cardNumber: number, index: number) => {
           // 카드 번호를 색상과 값으로 변환
-          const color = getCardColorFromNumber(cardNumber);
-          const value = getCardValueFromNumber(cardNumber);
+          const color = getCardColorFromNumber(cardNumber, maxNumber);
+          const value = getCardValueFromNumber(cardNumber, maxNumber);
           
           return {
             id: index,
@@ -296,9 +302,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       console.log('카드 제출:', message);
       
       // 모든 플레이어가 낸 패를 게임 보드에 표시
+      const maxNumber = message.maxNumber || 13;
+      console.log('[DEBUG] submitted message.maxNumber:', message.maxNumber);
       const submittedCards = message.cards.map((cardNumber: number, index: number) => {
-        const color = getCardColorFromNumber(cardNumber);
-        const value = getCardValueFromNumber(cardNumber);
+        const color = getCardColorFromNumber(cardNumber, maxNumber);
+        const value = getCardValueFromNumber(cardNumber, maxNumber);
         return {
           id: Date.now() + index + Math.random(), // 고유 ID 생성
           value: value,
@@ -338,9 +346,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
           const myPlayer = room.state.players.get(room.sessionId);
           if (myPlayer && myPlayer.hand) {
             // 백엔드의 손패를 기반으로 프론트엔드 손패 업데이트 (애니메이션 없이)
+            const maxNumber = room.state.maxNumber || 13;
+            console.log('[DEBUG] submitted room.state.maxNumber:', room.state.maxNumber);
             const handCards = myPlayer.hand.map((cardNumber: number, index: number) => {
-              const color = getCardColorFromNumber(cardNumber);
-              const value = getCardValueFromNumber(cardNumber);
+              const color = getCardColorFromNumber(cardNumber, maxNumber);
+              const value = getCardValueFromNumber(cardNumber, maxNumber);
               return {
                 id: index,
                 value: value,
@@ -366,7 +376,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         setGameState({
           lastType: currentRoom.state.lastType || 0,
           lastMadeType: currentRoom.state.lastMadeType || 0,
-          lastHighestValue: currentRoom.state.lastHighestValue || 0
+          lastHighestValue: currentRoom.state.lastHighestValue || -1
         });
       }
       
@@ -388,7 +398,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       setGameState({
         lastType: 0,
         lastMadeType: 0,
-        lastHighestValue: 0
+        lastHighestValue: -1
       });
       
       // 게임 보드 초기화
@@ -480,7 +490,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
 
   // 모드에 따른 카드 색상 결정 (게임 시작 시 한 번만)
   const getCardColor = () => {
-    return ['gold', 'silver', 'bronze', 'black'][Math.floor(Math.random() * 4)];
+    return ['black', 'bronze', 'silver', 'gold'][Math.floor(Math.random() * 4)];
   };
 
   // 현재 모드에 맞는 카드 색상 반환
@@ -543,18 +553,19 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     return isMyTurn;
   };
 
+
   // 카드 번호를 색상으로 변환 (올바른 매핑)
-  const getCardColorFromNumber = (cardNumber: number): string => {
-    // 카드 번호를 4로 나눈 나머지로 색상 결정 (0,1,2,3)
-    const colorIndex = cardNumber % 4;
-    const colors = ['gold', 'silver', 'bronze', 'black'];
+  const getCardColorFromNumber = (cardNumber: number, maxNumber: number): string => {
+    // 카드 번호를 maxNumber로 나눈 몫으로 색상 결정 (0,1,2,3)
+    const colorIndex = Math.floor(cardNumber / maxNumber);
+    const colors = ['black', 'bronze', 'silver', 'gold'];
     return colors[colorIndex];
   };
 
   // 카드 번호를 값으로 변환 (올바른 매핑)
-  const getCardValueFromNumber = (cardNumber: number): number => {
-    // 카드 번호를 4로 나눈 몫 + 1로 값 결정
-    return Math.floor(cardNumber / 4) + 1;
+  const getCardValueFromNumber = (cardNumber: number, maxNumber: number): number => {
+    // 카드 번호를 maxNumber로 나눈 나머지 + 1로 값 결정
+    return (cardNumber % maxNumber) + 1;
   };
 
   // 카드의 실제 순서 값을 계산하는 함수 (백엔드의 getValue와 일치)
@@ -715,8 +726,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     const maxNumber = room?.state?.maxNumber || 13;
     const { type, number } = parseCard(cardNumber, maxNumber);
     const orderValue = getCardOrderValue(cardNumber);
-    const color = getCardColorFromNumber(cardNumber);
-    const value = getCardValueFromNumber(cardNumber);
+    const color = getCardColorFromNumber(cardNumber, maxNumber);
+    const value = getCardValueFromNumber(cardNumber, maxNumber);
     const orderIndex = getOrderIndex(number, maxNumber);
     
     // 백엔드의 evaluateSimpleCombo에서 사용하는 계산 방식
@@ -1138,8 +1149,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
           if (myPlayer && myPlayer.hand) {
             // 백엔드 손패에서 해당 카드의 번호 찾기
             for (const cardNumber of myPlayer.hand) {
-              const color = getCardColorFromNumber(cardNumber);
-              const value = getCardValueFromNumber(cardNumber);
+              const maxNumber = room.state.maxNumber || 13;
+              console.log('[DEBUG] maxNumber from backend:', maxNumber, 'cardNumber:', cardNumber);
+              const color = getCardColorFromNumber(cardNumber, maxNumber);
+              const value = getCardValueFromNumber(cardNumber, maxNumber);
               if (color === selectedCard.color && value === selectedCard.value) {
                 return cardNumber;
               }
@@ -1334,7 +1347,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
                               className="card-image"
                             />
                           )}
-                          <span className="card-value">{card.value}</span>
+                          <span className="card-value">{card.value || '?'}</span>
                         </div>
                       )}
                     </div>
@@ -1470,7 +1483,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
                           className="card-image"
                         />
                       )}
-                      <span className="tile-value">{tile.value}</span>
+                      <span className="tile-value">{tile.value || '?'}</span>
                     </>
                   )}
                 </div>
