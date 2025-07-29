@@ -71,6 +71,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     col: number;
     playerId?: string;
     turnId?: number; // 같은 턴에 등록된 패인지 구분
+    submitTime?: number; // 제출 시간 (최근 패 표시용)
   }>>([]);
   const [sortedHand, setSortedHand] = useState<Array<{
     id: number;
@@ -104,6 +105,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     id: number;
     value: number;
     color: string;
+    submitTime?: number; // 제출 시간 (최근 패 표시용)
   }>>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -311,47 +313,45 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       // my-hand와 동일한 방식으로 maxNumber 가져오기
       const submittedMaxNumber = room?.state?.maxNumber ?? gameState.maxNumber;
       console.log('[DEBUG] submitted room.state.maxNumber:', room?.state?.maxNumber, 'gameState.maxNumber:', gameState.maxNumber, '최종 maxNumber:', submittedMaxNumber);
-      const submittedCards = message.cards.map((cardNumber: number, index: number) => {
-        const color = getCardColorFromNumber(cardNumber, submittedMaxNumber);
-        const value = getCardValueFromNumber(cardNumber, submittedMaxNumber);
-        console.log(`[DEBUG] 게임보드 카드 생성: cardNumber=${cardNumber}, maxNumber=${submittedMaxNumber}, color=${color}, value=${value}`);
-        return {
-          id: Date.now() + index + Math.random(), // 고유 ID 생성
-          value: value,
-          color: color,
-          playerId: message.playerId // 어떤 플레이어가 낸 패인지 저장
-        };
-      });
       
-      // 게임 보드에 직접 추가 (pendingCards 대신)
-      setBoardCards(prev => {
-        // 기존 카드들과 중복 체크
-        const newCards = submittedCards.filter((newCard: any) => 
-          !prev.some(existingCard => 
-            existingCard.value === newCard.value && 
-            existingCard.color === newCard.color &&
-            existingCard.playerId === newCard.playerId
-          )
-        );
-        
-        // 새로운 위치 찾기
-        const positionResult = findCardPosition(newCards);
-        if (positionResult.success && positionResult.position) {
-          const positionedCards = newCards.map((card: any, index: number) => ({
-            ...card,
-            row: positionResult.position!.row,
-            col: positionResult.position!.col + index,
+      // 백엔드에서 받은 위치 정보 사용 (모든 유저에게 동일한 위치)
+      // 백엔드에서 반드시 position 정보를 전송해야 함
+      if (message.position) {
+        const submittedCards = message.cards.map((cardNumber: number, index: number) => {
+          const color = getCardColorFromNumber(cardNumber, submittedMaxNumber);
+          const value = getCardValueFromNumber(cardNumber, submittedMaxNumber);
+          console.log(`[DEBUG] 게임보드 카드 생성: cardNumber=${cardNumber}, maxNumber=${submittedMaxNumber}, color=${color}, value=${value}, position=(${message.position.row}, ${message.position.col + index})`);
+          return {
+            id: Date.now() + index + Math.random(), // 고유 ID 생성
+            value: value,
+            color: color,
+            playerId: message.playerId, // 어떤 플레이어가 낸 패인지 저장
+            row: message.position.row,
+            col: message.position.col + index,
             isNew: true,
-            turnId: gameState.currentTurnId
-          }));
+            turnId: gameState.currentTurnId,
+            submitTime: Date.now() // 제출 시간 기록
+          };
+        });
+        
+        // 게임 보드에 직접 추가
+        setBoardCards(prev => {
+          // 기존 카드들과 중복 체크
+          const newCards = submittedCards.filter((newCard: any) => 
+            !prev.some(existingCard => 
+              existingCard.value === newCard.value && 
+              existingCard.color === newCard.color &&
+              existingCard.playerId === newCard.playerId
+            )
+          );
           
-          return [...prev, ...positionedCards];
-        } else {
-          // 위치를 찾지 못한 경우 대기 중인 패에 저장
-          setPendingCards(prev => [...prev, ...newCards]);
-          return prev;
-        }
-      });
+          return [...prev, ...newCards];
+        });
+      } else {
+        // 백엔드에서 위치 정보가 없는 경우 - 에러 처리
+        console.error('[ERROR] 백엔드에서 position 정보가 전송되지 않았습니다. 모든 유저에게 동일한 위치를 보장할 수 없습니다.');
+        alert('게임 보드 동기화 오류가 발생했습니다.');
+      }
       
       // 내가 카드를 제출했을 때만 손패에서 제거
       if (message.playerId === room.sessionId) {
@@ -645,7 +645,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         
         if (!canPlace) continue;
         
-        // 2. 여백 조건 확인
+        // 2. 여백 조건 확인 - 다른 턴의 패와는 반드시 1칸 이상 여백
         const leftCard = rowCards.find(c => c.col === startCol - 1);
         const rightCard = rowCards.find(c => c.col === startCol + newCards.length);
         
@@ -653,7 +653,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         const isSameTurn = leftCard?.turnId === gameState.currentTurnId || rightCard?.turnId === gameState.currentTurnId;
         
         if (!isSameTurn) {
-          // 다른 턴의 카드와는 반드시 여백이 있어야 함
+          // 다른 턴의 카드와는 반드시 여백이 있어야 함 (좌우 1칸 이상)
           if (leftCard || rightCard) {
             canPlace = false;
             continue;
@@ -915,7 +915,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       isNew: true,
       row: -1,
       col: -1,
-      turnId: gameState.currentTurnId
+      turnId: gameState.currentTurnId,
+      submitTime: Date.now() // 제출 시간 기록
     }));
     
     // 1단계: 일반적인 위치 찾기
@@ -1389,10 +1390,16 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
               <div key={rowIndex} className="board-row">
                 {Array.from({ length: boardSize.cols }, (_, colIndex) => {
                   const card = boardCards.find(c => c.row === rowIndex && c.col === colIndex);
+                  
+                  // 가장 최근에 제출된 패인지 확인 (submitTime 기준)
+                  const cardsWithSubmitTime = boardCards.filter(c => c.submitTime !== undefined);
+                  const maxSubmitTime = cardsWithSubmitTime.length > 0 ? Math.max(...cardsWithSubmitTime.map(c => c.submitTime!)) : 0;
+                  const isMostRecent = card && card.submitTime && card.submitTime === maxSubmitTime;
+                  
                   return (
                     <div key={colIndex} className="board-slot">
                       {card && (
-                        <div className={`board-card ${getDisplayColor(card.color, gameMode)} ${card.isNew ? 'new-card' : ''}`}>
+                        <div className={`board-card ${getDisplayColor(card.color, gameMode)} ${isMostRecent ? 'new-card' : ''}`}>
                           {getCardImage(getDisplayColor(card.color, gameMode)) && (
                             <img 
                               src={getCardImage(getDisplayColor(card.color, gameMode))!} 

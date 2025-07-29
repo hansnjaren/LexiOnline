@@ -106,7 +106,34 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
   room.state.lastCards = new ArraySchema<number>(...submitCards);
   room.state.lastPlayerIndex = room.state.nowPlayerIndex;
 
-  room.broadcast("submitted", { cards: submitCards, playerId: client.sessionId });
+  // 카드 위치 결정 (모든 유저에게 동일한 위치 보장)
+  const boardSize = { rows: 4, cols: 15 }; // 기본 보드 크기
+  const currentTurnId = room.state.round; // 턴 ID로 라운드 번호 사용
+  
+  // 현재 게임 보드 상태 (실제로는 room.state에 저장되어야 함)
+  const boardCards: Array<{ row: number; col: number; turnId: number }> = [];
+  
+  // 위치 결정
+  const positionResult = findCardPosition(submitCards, boardCards, boardSize, currentTurnId);
+  
+  if (positionResult.success && positionResult.position) {
+    console.log(`[DEBUG] 카드 위치 결정: row=${positionResult.position.row}, col=${positionResult.position.col}`);
+    room.broadcast("submitted", { 
+      cards: submitCards, 
+      playerId: client.sessionId,
+      position: positionResult.position,
+      maxNumber: room.state.maxNumber
+    });
+  } else {
+    console.log(`[DEBUG] 카드 위치 결정 실패, 기본 위치 사용`);
+    // 위치를 찾지 못한 경우 기본 위치 사용
+    room.broadcast("submitted", { 
+      cards: submitCards, 
+      playerId: client.sessionId,
+      position: { row: 0, col: 0 }, // 기본 위치
+      maxNumber: room.state.maxNumber
+    });
+  }
 
   // 플레이어 손패 비었으면 라운드 종료 호출
   if (player.hand.length === 0) {
@@ -170,3 +197,74 @@ export function handleEasyMode(room: IMyRoom, client: Client, data: any) {
 
 // parseCard 임포트용 타입 선언 (실제 import는 MyRoom.ts에서 진행)
 declare function parseCard(card: number, maxNumber: number): { type: number; number: number };
+
+// 카드 위치 결정 함수 (프론트엔드와 동일한 로직)
+function findCardPosition(
+  newCards: number[],
+  boardCards: Array<{ row: number; col: number; turnId: number }>,
+  boardSize: { rows: number; cols: number },
+  currentTurnId: number
+): { success: boolean; position?: { row: number; col: number } } {
+  // 가능한 모든 위치를 찾아서 랜덤하게 선택
+  const availablePositions: Array<{ row: number; col: number }> = [];
+  
+  // 모든 행에서 시도
+  for (let row = 0; row < boardSize.rows; row++) {
+    // 해당 행의 모든 기존 카드 위치 확인
+    const rowCards = boardCards.filter(c => c.row === row).sort((a, b) => a.col - b.col);
+    
+    // 해당 행에 카드가 없으면 모든 위치가 가능
+    if (rowCards.length === 0) {
+      if (newCards.length <= boardSize.cols) {
+        for (let startCol = 0; startCol <= boardSize.cols - newCards.length; startCol++) {
+          availablePositions.push({ row, col: startCol });
+        }
+      }
+      continue;
+    }
+    
+    // 기존 카드들 사이의 빈 공간 찾기
+    for (let startCol = 0; startCol <= boardSize.cols - newCards.length; startCol++) {
+      let canPlace = true;
+      
+      // 1. 새로운 카드들이 들어갈 위치에 기존 카드가 있는지 확인
+      for (let i = 0; i < newCards.length; i++) {
+        const col = startCol + i;
+        const existingCard = rowCards.find(c => c.col === col);
+        if (existingCard) {
+          canPlace = false;
+          break;
+        }
+      }
+      
+      if (!canPlace) continue;
+      
+      // 2. 여백 조건 확인 - 다른 턴의 패와는 반드시 1칸 이상 여백
+      const leftCard = rowCards.find(c => c.col === startCol - 1);
+      const rightCard = rowCards.find(c => c.col === startCol + newCards.length);
+      
+      // 같은 턴의 카드인지 확인
+      const isSameTurn = leftCard?.turnId === currentTurnId || rightCard?.turnId === currentTurnId;
+      
+      if (!isSameTurn) {
+        // 다른 턴의 카드와는 반드시 여백이 있어야 함 (좌우 1칸 이상)
+        if (leftCard || rightCard) {
+          canPlace = false;
+          continue;
+        }
+      }
+      
+      if (canPlace) {
+        availablePositions.push({ row, col: startCol });
+      }
+    }
+  }
+  
+  // 가능한 위치가 있으면 랜덤하게 선택
+  if (availablePositions.length > 0) {
+    const randomIndex = Math.floor(Math.random() * availablePositions.length);
+    return { success: true, position: availablePositions[randomIndex] };
+  }
+  
+  return { success: false };
+}
