@@ -82,7 +82,7 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
 
   // 카드 초기화 (라운드 로빈 분배용)
   useEffect(() => {
-    if (isVisible) {
+    if (isVisible && playerCount > 0 && cardsPerPlayer > 0) {
       console.log('CardDealAnimation 초기화:', {
         isVisible,
         playerCount,
@@ -110,7 +110,7 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
       
       console.log('초기화된 카드 수:', initialCards.length);
     }
-  }, [isVisible, playerCount, cardsPerPlayer, myPlayerIndex]);
+  }, [isVisible, playerCount, cardsPerPlayer]);
 
   // 카드 분배 시작 (라운드 로빈)
   useEffect(() => {
@@ -124,7 +124,7 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
       startDealing();
     }
     // eslint-disable-next-line
-  }, [isVisible, cards.length, isDealing, myPlayerIndex]);
+  }, [isVisible, cards.length, isDealing]);
 
   const startDealing = () => {
     let currentIndex = 0;
@@ -264,10 +264,10 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
     };
   };
 
-    if (!isVisible) {
-      console.log('CardDealAnimation 숨김');
-      return null;
-    }
+      if (!isVisible || playerCount === 0 || cardsPerPlayer === 0) {
+    console.log('CardDealAnimation 숨김');
+    return null;
+  }
     
     console.log('CardDealAnimation 렌더링:', {
       cardsLength: cards.length,

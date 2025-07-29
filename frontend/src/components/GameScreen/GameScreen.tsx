@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import './GameScreen.css';
 import coinImage from '../../coin.png';
@@ -24,6 +24,7 @@ interface Player {
   remainingTiles: number;
   isCurrentPlayer: boolean;
   sessionId: string;
+  hasPassed: boolean;
 }
 
 interface GameState {
@@ -108,6 +109,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     submitTime?: number; // 제출 시간 (최근 패 표시용)
   }>>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   
   // 게임 상태 (lastType, lastMadeType 등)
   const [gameState, setGameState] = useState<{
@@ -167,7 +169,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
               score: player.score || 0,
               remainingTiles: player.hand ? player.hand.length : 0,
               isCurrentPlayer: sessionId === room.sessionId,
-              sessionId: sessionId
+              sessionId: sessionId,
+              hasPassed: player.hasPassed || false
             });
           }
         });
@@ -222,7 +225,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         score: p.score,
         remainingTiles: p.remainingTiles,
         isCurrentPlayer: p.isCurrentPlayer,
-        sessionId: p.sessionId
+        sessionId: p.sessionId,
+        hasPassed: p.hasPassed || false
       }));
       
       setPlayers(playerList);
@@ -421,6 +425,28 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       // setSelectedCards([]); // 이 줄을 제거하여 선택 상태 유지
     });
 
+    room.onMessage('playerPassed', (message) => {
+      console.log('플레이어 패스:', message);
+      
+      // 해당 플레이어의 pass 상태 업데이트
+      setPlayers(prevPlayers => 
+        prevPlayers.map(player => 
+          player.sessionId === message.playerId 
+            ? { ...player, hasPassed: message.hasPassed }
+            : player
+        )
+      );
+    });
+
+    room.onMessage('passReset', (message) => {
+      console.log('패스 리셋:', message);
+      
+      // 모든 플레이어의 pass 상태를 false로 설정
+      setPlayers(prevPlayers => 
+        prevPlayers.map(player => ({ ...player, hasPassed: false }))
+      );
+    });
+
     room.onMessage('cycleEnded', (message) => {
       console.log('사이클 종료:', message);
       
@@ -433,8 +459,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         maxNumber: gameState.maxNumber // maxNumber는 유지
       });
       
-      // 게임 보드 초기화
-      setBoardCards([]);
+      // 게임 보드는 그대로 유지 (패들이 사라지지 않도록)
+      // setBoardCards([]);
     });
 
     room.onMessage('turnChanged', (message) => {
@@ -563,23 +589,15 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   };
 
   // 현재 플레이어가 자신인지 확인하는 함수
-  const isMyTurn = () => {
-    const room = ColyseusService.getRoom();
+  const room = ColyseusService.getRoom();
+  
+  const isMyTurn = useMemo(() => {
     if (!room) return false;
     
     // 백엔드 상태에서 직접 현재 플레이어 확인
     if (room.state && room.state.playerOrder && room.state.nowPlayerIndex !== undefined) {
       const currentPlayerSessionId = room.state.playerOrder[room.state.nowPlayerIndex];
       const isMyTurn = currentPlayerSessionId === room.sessionId;
-      
-      // 디버깅을 위한 로그
-      console.log(`[DEBUG] isMyTurn 체크 - 백엔드 상태:`, {
-        playerOrder: room.state.playerOrder,
-        nowPlayerIndex: room.state.nowPlayerIndex,
-        currentPlayerSessionId,
-        mySessionId: room.sessionId,
-        isMyTurn
-      });
       
       return isMyTurn;
     }
@@ -588,14 +606,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     const currentPlayer = players.find(p => p.isCurrentPlayer);
     const isMyTurn = currentPlayer && currentPlayer.sessionId === room.sessionId;
     
-    console.log(`[DEBUG] isMyTurn 체크 - 프론트엔드 상태:`, {
-      currentPlayer: currentPlayer?.nickname || '알 수 없음',
-      mySessionId: room.sessionId,
-      isMyTurn
-    });
-    
     return isMyTurn;
-  };
+  }, [room?.state?.playerOrder, room?.state?.nowPlayerIndex, room?.sessionId, players]);
 
 
   // 카드 번호를 색상으로 변환 (올바른 매핑)
@@ -1222,7 +1234,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
 
   const handlePass = () => {
     // 턴 체크 - 자신의 차례가 아니면 함수 실행 중단
-    if (!isMyTurn()) {
+    if (!isMyTurn) {
       console.log('[DEBUG] handlePass - 자신의 차례가 아님, 함수 실행 중단');
       return;
     }
@@ -1230,8 +1242,17 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     // 내가 pass를 눌렀을 때는 선택된 카드들을 해제
     setSelectedCards([]);
     
+    // 내 pass 상태를 즉시 업데이트
     const room = ColyseusService.getRoom();
     if (room) {
+      setPlayers(prevPlayers => 
+        prevPlayers.map(player => 
+          player.sessionId === room.sessionId 
+            ? { ...player, hasPassed: true }
+            : player
+        )
+      );
+      
       room.send('pass');
     }
   };
@@ -1244,7 +1265,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     }
     
     // 턴 체크 - 자신의 차례가 아니면 함수 실행 중단
-    if (!isMyTurn()) {
+    if (!isMyTurn) {
       console.log('[DEBUG] handleSubmitCards - 자신의 차례가 아님, 함수 실행 중단');
       return;
     }
@@ -1416,17 +1437,19 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   return (
     <div className="game-screen">
       {/* 카드 분배 애니메이션 */}
-      <CardDealAnimation
-        isVisible={showCardDealAnimation}
-        onComplete={handleCardDealComplete}
-        playerCount={players.length}
-        cardsPerPlayer={16}
-        myPlayerIndex={players.findIndex(p => p.isCurrentPlayer)} // 현재 플레이어 인덱스
-        myHand={myHand}
-        onPlayerCardReceived={handlePlayerCardReceived}
-        onMyCardDealt={handleMyCardDealt}
-        gameMode={gameMode as 'easyMode' | 'normal'}
-      />
+      {showCardDealAnimation && players.length > 0 && (
+        <CardDealAnimation
+          isVisible={showCardDealAnimation}
+          onComplete={handleCardDealComplete}
+          playerCount={players.length}
+          cardsPerPlayer={16}
+          myPlayerIndex={players.findIndex(p => p.sessionId === mySessionId)} // 내 플레이어 인덱스
+          myHand={myHand}
+          onPlayerCardReceived={handlePlayerCardReceived}
+          onMyCardDealt={handleMyCardDealt}
+          gameMode={gameMode as 'easyMode' | 'normal'}
+        />
+      )}
       
       <div className="game-container">
         {/* 상단 좌측 - 다른 플레이어 정보 */}
@@ -1438,16 +1461,18 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
               const nowPlayerIndex = room?.state?.nowPlayerIndex || 0;
               const myIndex = playerOrder.indexOf(mySessionId);
               
-              // 다른 플레이어들을 playerOrder 순서대로 정렬
+              // 다른 플레이어들을 턴 순서대로 정렬 (내 다음 턴부터 내 이전 턴까지)
               const otherPlayers = players.filter(player => player.sessionId !== mySessionId);
               const sortedOtherPlayers = otherPlayers.sort((a, b) => {
                 const aIndex = playerOrder.indexOf(a.sessionId);
                 const bIndex = playerOrder.indexOf(b.sessionId);
                 
-                // 현재 차례 기준으로 상대적 위치 계산
-                const aRelativeIndex = (aIndex - nowPlayerIndex + playerOrder.length) % playerOrder.length;
-                const bRelativeIndex = (bIndex - nowPlayerIndex + playerOrder.length) % playerOrder.length;
+                // 내 인덱스 기준으로 상대적 위치 계산
+                const myIndex = playerOrder.indexOf(mySessionId);
+                const aRelativeIndex = (aIndex - myIndex + playerOrder.length) % playerOrder.length;
+                const bRelativeIndex = (bIndex - myIndex + playerOrder.length) % playerOrder.length;
                 
+                // 내 다음 턴이 가장 위에 오도록 정렬
                 return aRelativeIndex - bRelativeIndex;
               });
               
@@ -1458,14 +1483,23 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
                 
                 return (
                   <div key={player.id} className="player-info-container">
-                    <div className={`player-info-box ${isCurrentTurn ? 'current-turn' : ''}`}>
+                    <div className={`player-info-box ${isCurrentTurn ? 'current-turn' : ''} ${player.hasPassed ? 'passed' : ''}`}>
                       <div className="player-info">
-                        <div className="player-nickname">{player.nickname}</div>
+                        <div className="player-nickname">
+                          {player.nickname}
+                        </div>
                         <div className="player-coins">
                           <img src={coinImage} alt="코인" className="coin-icon" />
                           {player.score}
                         </div>
                       </div>
+                      {player.hasPassed && (
+                        <div className="pass-overlay">
+                          <span className="pass-text">
+                            PASS
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="remaining-tiles-count">
                       <img src={cardImage} alt="카드" className="card-icon" />
@@ -1522,7 +1556,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
           <div className="bottom-top">
             {/* 좌측 - 내 정보 */}
             <div className="my-info">
-              <div className={`my-info-box ${isMyTurn() ? 'current-turn' : ''}`}>
+                              <div className={`my-info-box ${isMyTurn ? 'current-turn' : ''} ${players.find(p => p.sessionId === mySessionId)?.hasPassed ? 'passed' : ''}`}>
                 <div className="my-nickname">
                   {players.find(p => p.sessionId === mySessionId)?.nickname || '닉네임'}
                 </div>
@@ -1536,6 +1570,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
                     <AnimatedRemainingTiles count={showCardDealAnimation ? dealtCards.size : sortedHand.length} />
                   </span>
                 </div>
+                {players.find(p => p.sessionId === mySessionId)?.hasPassed && (
+                  <div className="pass-overlay">
+                    <span className="pass-text">
+                      PASS
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1566,32 +1607,32 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
             {/* 우측 - Drop/Pass 버튼 */}
             <div className="action-buttons">
               <button 
-                className={`action-btn drop-btn ${showCardDealAnimation || !isMyTurn() || isSubmitting ? 'disabled' : ''}`} 
+                className={`action-btn drop-btn ${showCardDealAnimation || !isMyTurn || isSubmitting ? 'disabled' : ''}`} 
                 onClick={(e) => {
                   e.preventDefault();
-                  if (showCardDealAnimation || !isMyTurn() || isSubmitting) {
+                  if (showCardDealAnimation || !isMyTurn || isSubmitting) {
                     console.log('[DEBUG] Submit 버튼 클릭 - 비활성화 상태');
                     return;
                   }
                   handleSubmitCards();
                 }}
-                disabled={showCardDealAnimation || !isMyTurn() || isSubmitting}
-                title={!isMyTurn() ? '다른 플레이어의 차례입니다' : isSubmitting ? '제출 중입니다' : '카드를 제출합니다'}
+                disabled={showCardDealAnimation || !isMyTurn || isSubmitting}
+                title={!isMyTurn ? '다른 플레이어의 차례입니다' : isSubmitting ? '제출 중입니다' : '카드를 제출합니다'}
               >
                 Submit
               </button>
               <button 
-                className={`action-btn pass-btn ${showCardDealAnimation || !isMyTurn() ? 'disabled' : ''}`} 
+                                className={`action-btn pass-btn ${showCardDealAnimation || !isMyTurn ? 'disabled' : ''}`}
                 onClick={(e) => {
                   e.preventDefault();
-                  if (showCardDealAnimation || !isMyTurn()) {
+                  if (showCardDealAnimation || !isMyTurn) {
                     console.log('[DEBUG] Pass 버튼 클릭 - 비활성화 상태');
                     return;
                   }
                   handlePass();
                 }}
-                disabled={showCardDealAnimation || !isMyTurn()}
-                title={!isMyTurn() ? '다른 플레이어의 차례입니다' : '패스합니다'}
+                disabled={showCardDealAnimation || !isMyTurn}
+                title={!isMyTurn ? '다른 플레이어의 차례입니다' : '패스합니다'}
               >
                 Pass
               </button>

@@ -367,6 +367,19 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       this.state.lastMadeType = MADE_NONE;
       this.state.lastHighestValue = -1;
       this.state.lastCards = new ArraySchema<number>();
+      
+      // pass 스티커 때문에 추가함
+      // 조합 리셋 시 모든 플레이어의 pass 상태도 리셋
+      for (const player of this.state.players.values()) {
+        player.hasPassed = false;
+      }
+      
+      // pass 스티커 때문에 추가함
+      // pass 상태 리셋을 모든 클라이언트에게 브로드캐스트
+      this.broadcast("passReset", {
+        message: "조합이 리셋되어 pass 상태가 초기화되었습니다."
+      });
+      
       this.broadcast("cycleEnded", {});
     }
     

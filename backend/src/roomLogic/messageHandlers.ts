@@ -103,6 +103,18 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
   // 제출 카드 손패에서 제거
   removeCardsFromHand(player.hand, submitCards);
 
+  // pass 스티커 때문에 추가함
+  // 모든 플레이어의 pass 상태 리셋 (새로운 패가 제출되었으므로)
+  for (const player of room.state.players.values()) {
+    player.hasPassed = false;
+  }
+  
+  // pass 스티커 때문에 추가함
+  // pass 상태 리셋을 모든 클라이언트에게 브로드캐스트
+  room.broadcast("passReset", {
+    message: "새로운 패가 제출되어 pass 상태가 리셋되었습니다."
+  });
+
   // 상태 업데이트
   room.state.lastType = submitCards.length;
   room.state.lastCards = new ArraySchema<number>(...submitCards);
@@ -153,6 +165,39 @@ export function handlePass(room: IMyRoom, client: Client) {
     client.send("passRejected", { reason: "Not your turn." });
     return;
   }
+  
+  // pass 스티커 때문에 추가함
+  // 현재 플레이어의 pass 상태를 true로 설정
+  const currentPlayer = room.state.players.get(client.sessionId);
+  if (currentPlayer) {
+    currentPlayer.hasPassed = true;
+  }
+  
+  // pass 상태를 모든 클라이언트에게 브로드캐스트
+  room.broadcast("playerPassed", {
+    playerId: client.sessionId,
+    hasPassed: true
+  });
+  
+  // 전체 멤버수-1명이 pass했는지 확인
+  const passedPlayersCount = Array.from(room.state.players.values()).filter(p => p.hasPassed).length;
+  const totalPlayersCount = room.state.players.size;
+  
+  if (passedPlayersCount >= totalPlayersCount - 1) {
+    // 모든 플레이어의 pass 상태 리셋
+    for (const player of room.state.players.values()) {
+      player.hasPassed = false;
+    }
+    
+    // pass 상태 리셋을 모든 클라이언트에게 브로드캐스트
+    room.broadcast("passReset", {
+      message: "모든 플레이어가 pass하여 새로운 라운드가 시작됩니다."
+    });
+    
+    // 게임보드의 패들은 그대로 유지하고 pass 상태만 리셋
+    // lastType, lastMadeType, lastHighestValue, lastCards는 그대로 유지
+  }
+  
   room.nextPlayer();
 }
 

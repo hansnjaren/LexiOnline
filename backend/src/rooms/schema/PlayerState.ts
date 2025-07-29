@@ -13,4 +13,6 @@ export class PlayerState extends Schema {
   @type("boolean") ready = false;
 
   @type("boolean") easyMode = false;
+
+  @type("boolean") hasPassed = false;
 }

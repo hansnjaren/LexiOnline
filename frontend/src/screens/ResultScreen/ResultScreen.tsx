@@ -106,7 +106,7 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
   const [showButtons, setShowButtons] = useState(true);
   const [roundResult, setRoundResult] = useState<RoundResult | null>(initialRoundResult || null);
   const [actualPlayerCount, setActualPlayerCount] = useState(playerCount);
-  const [isLayoutReady, setIsLayoutReady] = useState(false);
+  const [isReadyForAnimation, setIsReadyForAnimation] = useState(false);
 
   // 각 타일카운트 원의 ref를 개별적으로 생성
   const player0Ref = useRef<HTMLDivElement>(null);
@@ -148,12 +148,12 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
     
     setCenters(newCenters);
     
-    // 모든 요소가 렌더링되었는지 확인
-    const allElementsReady = Object.values(newCenters).every(center => center !== null);
-    if (allElementsReady && !isLayoutReady) {
-      setIsLayoutReady(true);
+    // 모든 위치가 계산되면 애니메이션 준비 완료
+    const allPositionsCalculated = Object.values(newCenters).every(pos => pos !== null);
+    if (allPositionsCalculated && !isReadyForAnimation) {
+      setIsReadyForAnimation(true);
     }
-  }, [showArrow, currentTransferStep, actualPlayerCount, isLayoutReady]);
+  }, [showArrow, currentTransferStep, actualPlayerCount, isReadyForAnimation]);
 
   useEffect(() => {
     // Colyseus 서비스에서 라운드 결과 정보 가져오기
@@ -209,6 +209,9 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
   }, []);
 
   useEffect(() => {
+    // 애니메이션 준비가 완료된 후에만 애니메이션 시작
+    if (!isReadyForAnimation) return;
+    
     // 참가자 인원수에 따라 메시지 배열 동적 생성
     const generateSteps = (count: number) => {
       const steps = [];
@@ -228,42 +231,27 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
     let currentStep = 0;
     setTransferMessage(steps[0]);
     setCurrentTransferStep(0);
+    setShowArrow(true);
     setShowButtons(false); // 애니메이션 시작 시 버튼 숨김
-    
-    // 요소들이 완전히 렌더링된 후 애니메이션 시작
-    const startAnimation = () => {
-      setShowArrow(true);
-      const timer = setInterval(() => {
-        if (currentStep < steps.length - 1) {
-          currentStep++;
-          setTransferMessage(steps[currentStep]);
-          setCurrentTransferStep(currentStep);
-          setShowArrow(true);
-        } else {
-          setShowArrow(false);
-          clearInterval(timer);
-          
-          // "결과 집계 완료!" 메시지가 표시된 후 2초 뒤에 버튼 표시
-          setTimeout(() => {
-            setTransferMessage('');
-            setShowButtons(true);
-          }, 2000);
-        }
-      }, 4000);
-      return timer;
-    };
-    
-    // 레이아웃이 준비된 후에만 애니메이션 시작
-    if (isLayoutReady) {
-      const timer = setTimeout(() => {
-        startAnimation();
-      }, 100);
-      
-      return () => {
-        clearTimeout(timer);
-      };
-    }
-  }, [actualPlayerCount, isLayoutReady]);
+    const timer = setInterval(() => {
+      if (currentStep < steps.length - 1) {
+        currentStep++;
+        setTransferMessage(steps[currentStep]);
+        setCurrentTransferStep(currentStep);
+        setShowArrow(true);
+      } else {
+        setShowArrow(false);
+        clearInterval(timer);
+        
+        // "결과 집계 완료!" 메시지가 표시된 후 2초 뒤에 버튼 표시
+        setTimeout(() => {
+          setTransferMessage('');
+          setShowButtons(true);
+        }, 2000);
+      }
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [actualPlayerCount, isReadyForAnimation]);
 
   // roundResult 변경 감지
   useEffect(() => {
