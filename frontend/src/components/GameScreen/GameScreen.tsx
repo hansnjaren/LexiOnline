@@ -1366,23 +1366,30 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         {/* 상단 좌측 - 다른 플레이어 정보 */}
         <div className="top-left-section">
           <div className="other-players">
-            {players.filter(player => !player.isCurrentPlayer).map((player, index) => (
-              <div key={player.id} className="player-info-container">
-                <div className={`player-info-box ${player.isCurrentPlayer ? 'current-turn' : ''}`}>
-                  <div className="player-info">
-                    <div className="player-nickname">{player.nickname}</div>
-                    <div className="player-coins">
-                      <img src={coinImage} alt="코인" className="coin-icon" />
-                      {player.score}
+            {players.filter(player => player.sessionId !== mySessionId).map((player, index) => {
+              // 현재 차례인 플레이어의 sessionId 찾기
+              const room = ColyseusService.getRoom();
+              const currentPlayerSessionId = room?.state?.playerOrder?.[room?.state?.nowPlayerIndex];
+              const isCurrentTurn = player.sessionId === currentPlayerSessionId;
+              
+              return (
+                <div key={player.id} className="player-info-container">
+                  <div className={`player-info-box ${isCurrentTurn ? 'current-turn' : ''}`}>
+                    <div className="player-info">
+                      <div className="player-nickname">{player.nickname}</div>
+                      <div className="player-coins">
+                        <img src={coinImage} alt="코인" className="coin-icon" />
+                        {player.score}
+                      </div>
                     </div>
                   </div>
+                  <div className="remaining-tiles-count">
+                    <img src={cardImage} alt="카드" className="card-icon" />
+                    <AnimatedRemainingTiles count={player.remainingTiles} />
+                  </div>
                 </div>
-                <div className="remaining-tiles-count">
-                  <img src={cardImage} alt="카드" className="card-icon" />
-                  <AnimatedRemainingTiles count={player.remainingTiles} />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -1430,14 +1437,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
           <div className="bottom-top">
             {/* 좌측 - 내 정보 */}
             <div className="my-info">
-              <div className={`my-info-box ${players.find(p => p.isCurrentPlayer)?.sessionId === mySessionId ? 'current-turn' : ''}`}>
+              <div className={`my-info-box ${isMyTurn() ? 'current-turn' : ''}`}>
                 <div className="my-nickname">
-                  {players.find(p => p.isCurrentPlayer)?.nickname || '닉네임'}
+                  {players.find(p => p.sessionId === mySessionId)?.nickname || '닉네임'}
                 </div>
                 <div className="my-stats">
                   <span className="my-coins">
                     <img src={coinImage} alt="코인" className="coin-icon" />
-                    {players.find(p => p.isCurrentPlayer)?.score || 0}
+                    {players.find(p => p.sessionId === mySessionId)?.score || 0}
                   </span>
                   <span className="my-tiles">
                     <img src={cardImage} alt="카드" className="card-icon" />

@@ -82,6 +82,23 @@
   border: 2px solid #ffc107;
   box-shadow: 0 0 15px rgba(255, 193, 7, 0.3);
   animation: pulse 2s infinite;
+  position: relative;
+}
+
+.player-info-box.current-turn::before {
+  content: "현재 차례";
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ffc107;
+  color: #000;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7vw;
+  font-weight: bold;
+  white-space: nowrap;
+  z-index: 10;
 }
 
 @keyframes pulse {
@@ -382,6 +399,30 @@
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  position: relative;
+}
+
+.my-info-box.current-turn {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border: 2px solid #ffc107;
+  box-shadow: 0 0 15px rgba(255, 193, 7, 0.3);
+  animation: pulse 2s infinite;
+}
+
+.my-info-box.current-turn::before {
+  content: "현재 차례";
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ffc107;
+  color: #000;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7vw;
+  font-weight: bold;
+  white-space: nowrap;
+  z-index: 10;
 }
 
 .my-nickname {
