@@ -20,9 +20,24 @@ interface GameScreenProps {
 interface Player {
   id: string;
   nickname: string;
-  coinCount: number;
+  score: number;
   remainingTiles: number;
   isCurrentPlayer: boolean;
+  sessionId: string;
+}
+
+interface GameState {
+  players: Map<string, Player>;
+  playerOrder: string[];
+  currentPlayerIndex: number;
+  lastCards: number[];
+  lastType: number;
+  lastMadeType: number;
+  lastHighestValue: number;
+  round: number;
+  totalRounds: number;
+  easyMode: boolean;
+  maxNumber: number;
 }
 
 // 애니메이션된 남은 패 개수 컴포넌트
@@ -65,7 +80,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   const [showGameGuide, setShowGameGuide] = useState(false);
   
   // 카드 분배 애니메이션 관련 상태
-  const [showCardDealAnimation, setShowCardDealAnimation] = useState(true);
+  const [showCardDealAnimation, setShowCardDealAnimation] = useState(false);
   const [isGameStarted, setIsGameStarted] = useState(false);
   const [dealtCards, setDealtCards] = useState<Set<number>>(new Set());
   const [visibleHand, setVisibleHand] = useState<Array<{
@@ -89,20 +104,15 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     color: string;
   }>>([]);
   
-  // 플레이어 정보 (플레이어 수에 따라 동적 생성)
-  const [players, setPlayers] = useState<Player[]>(() => {
-    const playerArray: Player[] = [];
-    for (let i = 1; i <= playerCount; i++) {
-      playerArray.push({
-        id: i.toString(),
-        nickname: '닉네임',
-        coinCount: Math.floor(Math.random() * 20) + 5,
-        remainingTiles: 0,
-        isCurrentPlayer: i === playerCount // 마지막 플레이어가 나
-      });
-    }
-    return playerArray;
-  });
+  // 플레이어 정보 (백엔드에서 동적으로 가져옴)
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [mySessionId, setMySessionId] = useState<string>('');
+  const [myHand, setMyHand] = useState<Array<{
+    id: number;
+    value: number;
+    color: string;
+    originalNumber: number;
+  }>>([]);
 
   // Colyseus 연결 초기화
   useEffect(() => {
@@ -113,13 +123,101 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       return;
     }
 
+    // 내 세션 ID 저장
+    setMySessionId(room.sessionId);
+
+    // 게임 화면 진입 시 즉시 플레이어 정보 요청
+    room.send("requestPlayerInfo");
+
     // 게임 상태 구독
     room.onStateChange((state) => {
       console.log('게임 상태 변경:', state);
-      // 게임 상태에 따른 UI 업데이트 로직 추가 예정
+      
+      // 플레이어 정보 업데이트
+      if (state.players && state.playerOrder) {
+        const playerList: Player[] = [];
+        
+        // playerOrder 순서대로 플레이어 정보 구성
+        state.playerOrder.forEach((sessionId: string, index: number) => {
+          const player = state.players.get(sessionId);
+          if (player) {
+            playerList.push({
+              id: index.toString(),
+              nickname: player.nickname || '익명',
+              score: player.score || 0,
+              remainingTiles: player.hand ? player.hand.length : 0,
+              isCurrentPlayer: sessionId === room.sessionId,
+              sessionId: sessionId
+            });
+          }
+        });
+        
+        setPlayers(playerList);
+        
+        // 백엔드 상태로부터 모든 플레이어의 남은 카드 수 동기화
+        syncPlayerRemainingCards();
+        
+        // 게임이 이미 시작되었고 손패가 있다면 손패만 업데이트 (애니메이션 없이)
+        const myPlayer = state.players.get(room.sessionId);
+        if (myPlayer && myPlayer.hand && myPlayer.hand.length > 0 && !showCardDealAnimation) {
+          console.log('이미 라운드가 시작됨, 손패만 업데이트 (애니메이션 없이)');
+          const handCards = myPlayer.hand.map((cardNumber: number, index: number) => {
+            const color = getCardColorFromNumber(cardNumber);
+            const value = getCardValueFromNumber(cardNumber);
+            return {
+              id: index,
+              value: value,
+              color: color,
+              originalNumber: cardNumber
+            };
+          });
+          
+          setMyHand(handCards);
+          setSortedHand(handCards);
+          setVisibleHand(handCards);
+        }
+      }
     });
 
     // 게임 메시지 수신
+    room.onMessage('playerInfoResponse', (message) => {
+      console.log('플레이어 정보 응답:', message);
+      console.log(`[DEBUG] 게임 시작 여부: ${message.isGameStarted}, 손패 길이: ${message.myHand?.length || 0}`);
+      
+      // 플레이어 정보 설정
+      const playerList: Player[] = message.players.map((p: any) => ({
+        id: p.sessionId,
+        nickname: p.nickname,
+        score: p.score,
+        remainingTiles: p.remainingTiles,
+        isCurrentPlayer: p.isCurrentPlayer,
+        sessionId: p.sessionId
+      }));
+      
+      setPlayers(playerList);
+      
+      // 게임이 이미 시작되었고 손패가 있다면 손패만 업데이트 (애니메이션 없이)
+      if (message.isGameStarted && message.myHand && message.myHand.length > 0) {
+        console.log('게임이 이미 시작됨, 손패 정보로 손패만 업데이트 (애니메이션 없이)');
+        const handCards = message.myHand.map((cardNumber: number, index: number) => {
+          const color = getCardColorFromNumber(cardNumber);
+          const value = getCardValueFromNumber(cardNumber);
+          return {
+            id: index,
+            value: value,
+            color: color,
+            originalNumber: cardNumber
+          };
+        });
+        
+        setMyHand(handCards);
+        setSortedHand(handCards);
+        setVisibleHand(handCards);
+      } else {
+        console.log('[DEBUG] 게임이 시작되지 않았거나 손패가 없음');
+      }
+    });
+
     room.onMessage('gameEnded', (message) => {
       console.log('게임 종료:', message);
       onScreenChange('result');
@@ -127,20 +225,169 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
 
     room.onMessage('roundStart', (message) => {
       console.log('라운드 시작:', message);
-      // 라운드 시작 로직 추가 예정
+      
+      // 내 손패 설정
+      if (message.hand) {
+        const handCards = message.hand.map((cardNumber: number, index: number) => {
+          // 카드 번호를 색상과 값으로 변환
+          const color = getCardColorFromNumber(cardNumber);
+          const value = getCardValueFromNumber(cardNumber);
+          
+          return {
+            id: index,
+            value: value,
+            color: color,
+            originalNumber: cardNumber // 원본 카드 번호 저장
+          };
+        });
+        
+        setMyHand(handCards);
+        setSortedHand(handCards);
+        
+        // 카드 분배 애니메이션 시작
+        setShowCardDealAnimation(true);
+        setDealtCards(new Set());
+        setVisibleHand([]);
+      }
+
+      // 모든 플레이어 정보 업데이트
+      if (message.allPlayers) {
+        const updatedPlayers: Player[] = message.allPlayers.map((p: any) => ({
+          id: p.sessionId,
+          nickname: p.nickname,
+          score: p.score,
+          remainingTiles: p.remainingTiles,
+          isCurrentPlayer: p.isCurrentPlayer,
+          sessionId: p.sessionId
+        }));
+        
+        setPlayers(updatedPlayers);
+        console.log('라운드 시작 시 플레이어 목록 업데이트:', updatedPlayers);
+        
+        // 현재 턴 플레이어 정보 출력
+        const currentPlayer = updatedPlayers.find(p => p.isCurrentPlayer);
+        const isMyTurn = currentPlayer && currentPlayer.sessionId === room.sessionId;
+        console.log(`[DEBUG] 라운드 시작 - 현재 턴: ${currentPlayer?.nickname || '알 수 없음'}, 내 턴인가?: ${isMyTurn}`);
+      }
     });
 
     room.onMessage('submitted', (message) => {
       console.log('카드 제출:', message);
-      // 카드 제출 로직 추가 예정
+      
+      // 내가 카드를 제출했을 때 손패에서 제거
+      if (message.playerId === room.sessionId) {
+        // 백엔드에서 제출된 카드들을 손패에서 제거
+        const room = ColyseusService.getRoom();
+        if (room) {
+          const myPlayer = room.state.players.get(room.sessionId);
+          if (myPlayer && myPlayer.hand) {
+            // 백엔드의 손패를 기반으로 프론트엔드 손패 업데이트 (애니메이션 없이)
+            const handCards = myPlayer.hand.map((cardNumber: number, index: number) => {
+              const color = getCardColorFromNumber(cardNumber);
+              const value = getCardValueFromNumber(cardNumber);
+              return {
+                id: index,
+                value: value,
+                color: color,
+                originalNumber: cardNumber // 원본 카드 번호 저장
+              };
+            });
+            
+            // 카드 분배 애니메이션 없이 직접 업데이트
+            setMyHand(handCards);
+            setSortedHand(handCards);
+            setVisibleHand(handCards); // visibleHand도 직접 업데이트
+          }
+        }
+        
+        // 제출된 카드들을 pendingCards에 추가하여 게임 보드에 배치
+        const submittedCards = message.cards.map((cardNumber: number, index: number) => {
+          const color = getCardColorFromNumber(cardNumber);
+          const value = getCardValueFromNumber(cardNumber);
+          return {
+            id: Date.now() + index, // 고유 ID 생성
+            value: value,
+            color: color
+          };
+        });
+        
+        setPendingCards(prev => [...prev, ...submittedCards]);
+      }
+      
+      // 백엔드 상태로부터 모든 플레이어의 남은 카드 수 동기화
+      syncPlayerRemainingCards();
+    });
+
+    room.onMessage('pass', (message) => {
+      console.log('패스:', message);
+      
+      // 백엔드 상태로부터 모든 플레이어의 남은 카드 수 동기화
+      syncPlayerRemainingCards();
+    });
+
+    room.onMessage('turnChanged', (message) => {
+      console.log('턴 변경:', message);
+      
+      // 모든 플레이어 정보 업데이트
+      if (message.allPlayers) {
+        const updatedPlayers: Player[] = message.allPlayers.map((p: any) => ({
+          id: p.sessionId,
+          nickname: p.nickname,
+          score: p.score,
+          remainingTiles: p.remainingTiles,
+          isCurrentPlayer: p.isCurrentPlayer,
+          sessionId: p.sessionId
+        }));
+        
+        setPlayers(updatedPlayers);
+        console.log('턴 변경 시 플레이어 목록 업데이트:', updatedPlayers);
+        
+        // 현재 턴 플레이어 정보 출력
+        const currentPlayer = updatedPlayers.find(p => p.isCurrentPlayer);
+        const isMyTurn = currentPlayer && currentPlayer.sessionId === room.sessionId;
+        console.log(`[DEBUG] 현재 턴: ${currentPlayer?.nickname || '알 수 없음'}, 내 턴인가?: ${isMyTurn}`);
+      }
+    });
+
+    room.onMessage('submitRejected', (message) => {
+      console.log('카드 제출 거부:', message);
+      alert('카드 제출이 거부되었습니다: ' + message.reason);
+    });
+
+    room.onMessage('noCard', (message) => {
+      console.log('카드 없음 오류:', message);
+      alert('보유하지 않은 카드를 제출하려고 했습니다: ' + message.reason);
+    });
+
+    room.onMessage('passRejected', (message) => {
+      console.log('패스 거부:', message);
+      alert('패스가 거부되었습니다: ' + message.reason);
+    });
+
+    room.onMessage('invalidPlayer', (message) => {
+      console.log('플레이어 정보 오류:', message);
+      alert('플레이어 정보가 유효하지 않습니다: ' + message.reason);
     });
 
     room.onMessage('gameStarted', (message) => {
       console.log('게임 시작:', message);
+      setIsGameStarted(true);
       // 백엔드에서 받은 easyMode 상태로 프론트엔드 상태 동기화
       if (message.easyMode !== undefined) {
         setGameMode(message.easyMode ? 'easyMode' : 'normal');
       }
+    });
+
+    room.onMessage('gameReset', (message) => {
+      console.log('게임 상태 초기화:', message);
+      setIsGameStarted(false);
+      setMyHand([]);
+      setSortedHand([]);
+      setShowCardDealAnimation(false);
+      setDealtCards(new Set());
+      setVisibleHand([]);
+      setSelectedCards([]);
+      setPendingCards([]);
     });
 
     // 방에서 나갈 때 정리
@@ -189,14 +436,44 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     }
   };
 
-  // 내 손패 (16개 - 이미지에 맞게)
-  const [myHand] = useState(() => 
-    Array.from({ length: 16 }, (_, index) => ({
-      id: index,
-      value: Math.floor(Math.random() * 13) + 1,
-      color: getCardColor()
-    }))
-  );
+  // 현재 플레이어가 자신인지 확인하는 함수
+  const isMyTurn = () => {
+    const room = ColyseusService.getRoom();
+    if (!room) return false;
+    
+    const currentPlayer = players.find(p => p.isCurrentPlayer);
+    return currentPlayer && currentPlayer.sessionId === room.sessionId;
+  };
+
+  // 카드 번호를 색상으로 변환
+  const getCardColorFromNumber = (cardNumber: number): string => {
+    // 카드 번호를 4로 나눈 나머지로 색상 결정
+    const colorIndex = cardNumber % 4;
+    const colors = ['gold', 'silver', 'bronze', 'black'];
+    return colors[colorIndex];
+  };
+
+  // 카드 번호를 값으로 변환
+  const getCardValueFromNumber = (cardNumber: number): number => {
+    // 카드 번호를 4로 나눈 몫 + 1로 값 결정
+    return Math.floor(cardNumber / 4) + 1;
+  };
+
+  // 백엔드 상태로부터 모든 플레이어의 남은 카드 수 동기화
+  const syncPlayerRemainingCards = () => {
+    const room = ColyseusService.getRoom();
+    if (!room) return;
+    
+    setPlayers(prevPlayers => 
+      prevPlayers.map(player => {
+        const backendPlayer = room.state.players.get(player.sessionId);
+        return {
+          ...player,
+          remainingTiles: backendPlayer && backendPlayer.hand ? backendPlayer.hand.length : 0
+        };
+      })
+    );
+  };
 
   // 정렬된 손패 초기화
   useEffect(() => {
@@ -212,15 +489,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
 
   const handleCardDealComplete = () => {
     setShowCardDealAnimation(false);
-    setIsGameStarted(true);
     setDealtCards(new Set());
     setVisibleHand([...myHand]); // 모든 카드를 visibleHand에 설정
-    
-    // 게임 시작 시 플레이어들의 남은 패 개수를 모두 16으로 설정
-    setPlayers(prev => prev.map((player, index) => ({
-      ...player,
-      remainingTiles: 16
-    })));
     
     // 손패를 정렬된 상태로 설정
     setSortedHand([...myHand]);
@@ -282,76 +552,76 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       col: -1
     }));
     
-                    // 랜덤 위치 찾기 (기존 카드들과 겹치지 않고 좌우 여백 한 칸씩 필수)
-        const findRandomPosition = (currentBoardSize = boardSize) => {
-          // 가능한 모든 위치를 찾아서 랜덤하게 선택
-          const availablePositions: Array<{ row: number; col: number }> = [];
-          
-          // 모든 행에서 시도
-          for (let row = 0; row < currentBoardSize.rows; row++) {
-            // 해당 행의 모든 기존 카드 위치 확인
-            const rowCards = boardCards.filter(c => c.row === row).sort((a, b) => a.col - b.col);
-            
-            // 해당 행에 카드가 없으면 모든 위치가 가능
-            if (rowCards.length === 0) {
-              if (newCards.length <= currentBoardSize.cols) {
-                for (let startCol = 0; startCol <= currentBoardSize.cols - newCards.length; startCol++) {
-                  availablePositions.push({ row, col: startCol });
-                }
-              }
-              continue;
-            }
-            
-            // 기존 카드들 사이의 빈 공간 찾기
+    // 랜덤 위치 찾기 (기존 카드들과 겹치지 않고 좌우 여백 한 칸씩 필수)
+    const findRandomPosition = (currentBoardSize = boardSize) => {
+      // 가능한 모든 위치를 찾아서 랜덤하게 선택
+      const availablePositions: Array<{ row: number; col: number }> = [];
+      
+      // 모든 행에서 시도
+      for (let row = 0; row < currentBoardSize.rows; row++) {
+        // 해당 행의 모든 기존 카드 위치 확인
+        const rowCards = boardCards.filter(c => c.row === row).sort((a, b) => a.col - b.col);
+        
+        // 해당 행에 카드가 없으면 모든 위치가 가능
+        if (rowCards.length === 0) {
+          if (newCards.length <= currentBoardSize.cols) {
             for (let startCol = 0; startCol <= currentBoardSize.cols - newCards.length; startCol++) {
-              let canPlace = true;
-              
-              // 1. 새로운 카드들이 들어갈 위치에 기존 카드가 있는지 확인
-              for (let i = 0; i < newCards.length; i++) {
-                const col = startCol + i;
-                const existingCard = rowCards.find(c => c.col === col);
-                if (existingCard) {
-                  canPlace = false;
-                  break;
-                }
-              }
-              
-              if (!canPlace) continue;
-              
-              // 2. 좌측 여백 확인 (새로운 카드들 왼쪽에 기존 카드가 있으면 반드시 한 칸 이상 여백 필요)
-              const leftCard = rowCards.find(c => c.col === startCol - 1);
-              if (leftCard) {
-                canPlace = false;
-                continue;
-              }
-              
-              // 3. 우측 여백 확인 (새로운 카드들 오른쪽에 기존 카드가 있으면 반드시 한 칸 이상 여백 필요)
-              const rightCard = rowCards.find(c => c.col === startCol + newCards.length);
-              if (rightCard) {
-                canPlace = false;
-                continue;
-              }
-              
-              if (canPlace) {
-                availablePositions.push({ row, col: startCol });
-              }
+              availablePositions.push({ row, col: startCol });
+            }
+          }
+          continue;
+        }
+        
+        // 기존 카드들 사이의 빈 공간 찾기
+        for (let startCol = 0; startCol <= currentBoardSize.cols - newCards.length; startCol++) {
+          let canPlace = true;
+          
+          // 1. 새로운 카드들이 들어갈 위치에 기존 카드가 있는지 확인
+          for (let i = 0; i < newCards.length; i++) {
+            const col = startCol + i;
+            const existingCard = rowCards.find(c => c.col === col);
+            if (existingCard) {
+              canPlace = false;
+              break;
             }
           }
           
-          // 가능한 위치가 있으면 랜덤하게 선택
-          if (availablePositions.length > 0) {
-            const randomPosition = availablePositions[Math.floor(Math.random() * availablePositions.length)];
-            
-            // 위치 할당
-            newCards.forEach((card, index) => {
-              card.row = randomPosition.row;
-              card.col = randomPosition.col + index;
-            });
-            return true;
+          if (!canPlace) continue;
+          
+          // 2. 좌측 여백 확인 (새로운 카드들 왼쪽에 기존 카드가 있으면 반드시 한 칸 이상 여백 필요)
+          const leftCard = rowCards.find(c => c.col === startCol - 1);
+          if (leftCard) {
+            canPlace = false;
+            continue;
           }
           
-          return false;
-        };
+          // 3. 우측 여백 확인 (새로운 카드들 오른쪽에 기존 카드가 있으면 반드시 한 칸 이상 여백 필요)
+          const rightCard = rowCards.find(c => c.col === startCol + newCards.length);
+          if (rightCard) {
+            canPlace = false;
+            continue;
+          }
+          
+          if (canPlace) {
+            availablePositions.push({ row, col: startCol });
+          }
+        }
+      }
+      
+      // 가능한 위치가 있으면 랜덤하게 선택
+      if (availablePositions.length > 0) {
+        const randomPosition = availablePositions[Math.floor(Math.random() * availablePositions.length)];
+        
+        // 위치 할당
+        newCards.forEach((card, index) => {
+          card.row = randomPosition.row;
+          card.col = randomPosition.col + index;
+        });
+        return true;
+      }
+      
+      return false;
+    };
     
     const success = findRandomPosition();
     
@@ -453,8 +723,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   // 보드 크기가 변경될 때 대기 중인 패 자동 제출
   useEffect(() => {
     if (pendingCards.length > 0) {
-      console.log('useEffect: 보드 크기 변경 감지, submitPendingCards 호출');
-      // 보드 크기 변경 시 즉시 제출 시도
+      console.log('useEffect: pendingCards 변경 감지, submitPendingCards 호출');
+      // pendingCards가 추가되거나 보드 크기가 변경될 때 즉시 제출 시도
       submitPendingCards();
     }
   }, [boardSize, pendingCards.length]);
@@ -547,252 +817,64 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   };
 
   const handlePass = () => {
-    console.log('Pass 액션');
+    const room = ColyseusService.getRoom();
+    if (room) {
+      room.send('pass');
+    }
   };
 
   const handleSubmitCards = () => {
-    if (selectedCards.length === 0) return;
-    
-    // 새로운 카드들을 보드에 추가 (기존 카드는 전혀 건드리지 않음)
-    const newCards = selectedCards.map((cardId, index) => {
-      const card = sortedHand.find(c => c.id === cardId);
-      if (!card) return null;
-      
-      return {
-        ...card,
-        isNew: true,
-        row: -1, // 임시 값, 나중에 계산
-        col: -1  // 임시 값, 나중에 계산
-      };
-    }).filter((card): card is NonNullable<typeof card> => card !== null);
-    
-    // 랜덤 위치 찾기 (기존 카드들과 겹치지 않고 좌우 여백 한 칸씩 필수)
-    const findRandomPosition = (currentBoardSize = boardSize) => {
-      // 가능한 모든 위치를 찾아서 랜덤하게 선택
-      const availablePositions: Array<{ row: number; col: number }> = [];
-      
-      // 모든 행에서 시도
-      for (let row = 0; row < currentBoardSize.rows; row++) {
-        // 해당 행의 모든 기존 카드 위치 확인
-        const rowCards = boardCards.filter(c => c.row === row).sort((a, b) => a.col - b.col);
-        
-        // 해당 행에 카드가 없으면 모든 위치가 가능
-        if (rowCards.length === 0) {
-          if (newCards.length <= currentBoardSize.cols) {
-            for (let startCol = 0; startCol <= currentBoardSize.cols - newCards.length; startCol++) {
-              availablePositions.push({ row, col: startCol });
-            }
-          }
-          continue;
-        }
-        
-        // 기존 카드들 사이의 빈 공간 찾기
-        for (let startCol = 0; startCol <= currentBoardSize.cols - newCards.length; startCol++) {
-          let canPlace = true;
-          
-          // 1. 새로운 카드들이 들어갈 위치에 기존 카드가 있는지 확인
-          for (let i = 0; i < newCards.length; i++) {
-            const col = startCol + i;
-            const existingCard = rowCards.find(c => c.col === col);
-            if (existingCard) {
-              canPlace = false;
-              break;
-            }
-          }
-          
-          if (!canPlace) continue;
-          
-          // 2. 좌측 여백 확인 (새로운 카드들 왼쪽에 기존 카드가 있으면 반드시 한 칸 이상 여백 필요)
-          const leftCard = rowCards.find(c => c.col === startCol - 1);
-          if (leftCard) {
-            canPlace = false;
-            continue;
-          }
-          
-          // 3. 우측 여백 확인 (새로운 카드들 오른쪽에 기존 카드가 있으면 반드시 한 칸 이상 여백 필요)
-          const rightCard = rowCards.find(c => c.col === startCol + newCards.length);
-          if (rightCard) {
-            canPlace = false;
-            continue;
-          }
-          
-          if (canPlace) {
-            availablePositions.push({ row, col: startCol });
-          }
-        }
-      }
-      
-      // 가능한 위치가 있으면 랜덤하게 선택
-      if (availablePositions.length > 0) {
-        const randomPosition = availablePositions[Math.floor(Math.random() * availablePositions.length)];
-        
-        // 위치 할당
-        newCards.forEach((card, index) => {
-          card.row = randomPosition.row;
-          card.col = randomPosition.col + index;
-        });
-        return true;
-      }
-      
-      return false;
-    };
-    
-    // 여백 압축 및 배치 함수
-    const compressAndPlace = () => {
-      console.log('compressAndPlace 시작, newCards 길이:', newCards.length);
-      
-      // 압축은 실제로는 하지 않고, 단순히 새로운 카드를 배치할 수 있는지만 확인
-      for (let targetRow = 0; targetRow < boardSize.rows; targetRow++) {
-        const rowCards = boardCards.filter(c => c.row === targetRow).sort((a, b) => a.col - b.col);
-        console.log(`행 ${targetRow}의 카드 수:`, rowCards.length);
-        
-        // 해당 행에 카드가 없으면 바로 배치 가능
-        if (rowCards.length === 0) {
-          console.log(`행 ${targetRow}가 비어있어서 바로 배치`);
-          newCards.forEach((card, index) => {
-            card.row = targetRow;
-            card.col = index;
-          });
-          // 새로운 카드만 추가 (기존 카드는 전혀 건드리지 않음)
-          setBoardCards(prev => [...prev, ...newCards]);
-          return true;
-        }
-        
-                  // 해당 행에 새로운 카드를 배치할 수 있는지 확인 (압축 없이)
-          // 가능한 모든 위치를 찾아서 랜덤하게 선택
-          const availablePositions: number[] = [];
-          
-          for (let col = 0; col <= boardSize.cols - newCards.length; col++) {
-            let canPlace = true;
-            
-            // 해당 위치에 카드가 있는지 확인
-            for (let i = 0; i < newCards.length; i++) {
-              const existingCard = rowCards.find(c => c.col === col + i);
-              if (existingCard) {
-                canPlace = false;
-                break;
-              }
-            }
-            
-            if (canPlace) {
-              // 기존 카드들과의 여백 확인 (좌우 한 칸 이상 여백 필요)
-              const leftCard = rowCards.find(c => c.col === col - 1);
-              const rightCard = rowCards.find(c => c.col === col + newCards.length);
-              
-              // 좌우에 기존 카드가 있으면 여백이 있어야 함
-              if (leftCard || rightCard) {
-                console.log(`위치 ${col}에서 좌우 여백 문제로 배치 불가`);
-                continue; // 이 위치는 사용할 수 없음
-              }
-              
-              availablePositions.push(col);
-            }
-          }
-          
-          // 가능한 위치가 있으면 랜덤하게 선택
-          if (availablePositions.length > 0) {
-            const randomCol = availablePositions[Math.floor(Math.random() * availablePositions.length)];
-            console.log(`위치 ${randomCol}에 새로운 카드 배치 성공 (랜덤 선택)`);
-            
-            // 새로운 카드들 배치
-            newCards.forEach((card, index) => {
-              card.row = targetRow;
-              card.col = randomCol + index;
-            });
-            
-            // 새로운 카드만 추가 (기존 카드는 전혀 건드리지 않음)
-            setBoardCards(prev => [...prev, ...newCards]);
-            return true;
-          }
-        
-        console.log(`행 ${targetRow}에서 배치 실패`);
-      }
-      
-      return false;
-    };
-    
-    const success = findRandomPosition();
-    
-    // 위치를 찾지 못한 경우 보드 확장
-    if (!success && boardSize.rows === 4 && boardSize.cols === 15) {
-      console.log('15x4에서 20x5로 확장 시도');
-      // 보드 확장만 하고 기존 카드는 전혀 건드리지 않음
-      setBoardSize({ rows: 5, cols: 20 });
-      // 확장 후 다시 위치 찾기 시도
-      setTimeout(() => {
-        const retrySuccess = findRandomPosition({ rows: 5, cols: 20 });
-        if (retrySuccess) {
-          console.log('20x5 확장 성공');
-          // 새로운 카드만 추가 (기존 카드들은 전혀 건드리지 않음)
-          setBoardCards(prev => [...prev, ...newCards]);
-          // 확장 성공 후 대기 중인 카드들도 자동으로 등록 시도
-          setTimeout(() => {
-            if (pendingCards.length > 0) {
-              submitPendingCards();
-            }
-          }, 200);
-        } else {
-          console.log('20x5 확장 실패, 대기 중인 패에 저장');
-          // 여전히 실패하면 대기 중인 패에 저장
-          setPendingCards(prev => [...prev, ...newCards]);
-        }
-      }, 100);
-    } else if (!success && (boardSize.rows === 5 && boardSize.cols === 20)) {
-      console.log('20x5에서 압축 시도');
-      // 20x5에서도 실패한 경우, 여백 압축 시도
-      const compressedSuccess = compressAndPlace();
-      if (compressedSuccess) {
-        console.log('압축 성공');
-        // 압축 성공 시 이미 setBoardCards가 호출되었으므로 추가 작업 불필요
-        // 압축 성공 후 대기 중인 카드들도 자동으로 등록 시도
-        setTimeout(() => {
-          if (pendingCards.length > 0) {
-            submitPendingCards();
-          }
-        }, 200);
-      } else {
-        console.log('압축 실패, 25x6으로 확장 시도');
-        // 압축해도 실패하면 25x6으로 확장 (기존 카드는 전혀 건드리지 않음)
-        setBoardSize({ rows: 6, cols: 25 });
-        setTimeout(() => {
-          const retrySuccess = findRandomPosition({ rows: 6, cols: 25 });
-          if (retrySuccess) {
-            console.log('25x6 확장 성공');
-            // 새로운 카드만 추가 (기존 카드들은 전혀 건드리지 않음)
-            setBoardCards(prev => [...prev, ...newCards]);
-            // 확장 성공 후 대기 중인 카드들도 자동으로 등록 시도
-            setTimeout(() => {
-              if (pendingCards.length > 0) {
-                submitPendingCards();
-              }
-            }, 200);
-          } else {
-            console.log('25x6 확장 실패, 대기 중인 패에 저장');
-            // 여전히 실패하면 대기 중인 패에 저장
-            setPendingCards(prev => [...prev, ...newCards]);
-          }
-        }, 100);
-      }
-    } else if (success) {
-      // 성공한 경우에만 기존 카드들의 isNew를 false로 설정하고 새로운 카드 추가
-      setBoardCards(prev => [...prev.map(card => ({ ...card, isNew: false })), ...newCards]);
+    if (selectedCards.length === 0) {
+      alert('제출할 카드를 선택해주세요.');
+      return;
     }
-    
-    // 하단 패 영역에서 선택된 카드들을 삭제하고 남은 패 개수 업데이트
-    if (success || (boardSize.rows === 4 && boardSize.cols === 15) || (boardSize.rows === 5 && boardSize.cols === 20)) {
-      // 선택된 카드들을 하단 패에서 제거
-      setSortedHand(prev => prev.filter(card => !selectedCards.includes(card.id)));
-      setVisibleHand(prev => prev.filter(card => !selectedCards.includes(card.id)));
+
+    // 선택된 카드들을 백엔드로 전송
+    const room = ColyseusService.getRoom();
+    if (room) {
+      // 카드 번호로 변환 (백엔드 형식)
+      const cardNumbers = selectedCards.map(cardId => {
+        // sortedHand에서 선택된 카드의 정보를 가져오기
+        const selectedCard = sortedHand.find(c => c.id === cardId);
+        if (!selectedCard) {
+          console.error('선택된 카드를 찾을 수 없습니다:', cardId);
+          return null;
+        }
+        
+        // 백엔드에서 직접 손패 정보를 가져와서 카드 번호 찾기
+        const room = ColyseusService.getRoom();
+        if (room) {
+          const myPlayer = room.state.players.get(room.sessionId);
+          if (myPlayer && myPlayer.hand) {
+            // 백엔드 손패에서 해당 카드의 번호 찾기
+            for (const cardNumber of myPlayer.hand) {
+              const color = getCardColorFromNumber(cardNumber);
+              const value = getCardValueFromNumber(cardNumber);
+              if (color === selectedCard.color && value === selectedCard.value) {
+                return cardNumber;
+              }
+            }
+          }
+        }
+        
+        console.error('백엔드에서 카드 번호를 찾을 수 없습니다:', selectedCard);
+        return null;
+      }).filter(num => num !== null);
+
+      console.log('[DEBUG] 제출하려는 카드들:', {
+        selectedCards,
+        cardNumbers,
+        myHand: myHand.map(c => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })),
+        sortedHand: sortedHand.map(c => ({ id: c.id, value: c.value, color: c.color }))
+      });
+
+      // 백엔드에 submit 메시지 전송
+      console.log(`[DEBUG] submit 메시지 전송: sessionId=${room.sessionId}, submitCards=${cardNumbers.join(', ')}`);
+      room.send('submit', { submitCards: cardNumbers });
       
-      // 현재 플레이어의 남은 패 개수 업데이트
-      setPlayers(prev => prev.map(player => 
-        player.isCurrentPlayer 
-          ? { ...player, remainingTiles: player.remainingTiles - selectedCards.length }
-          : player
-      ));
+      // 선택 상태 초기화 (백엔드 응답 대기)
+      setSelectedCards([]);
     }
-    
-    setSelectedCards([]);
   };
 
   const handleSortByNumber = () => {
@@ -828,7 +910,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     setIsSorting(true);
     
     // 정렬된 순서 계산
-        const colorOrder = gameMode === 'easyMode'
+    const colorOrder = gameMode === 'easyMode'
       ? ['gold', 'silver', 'bronze', 'black']
       : ['sun', 'moon', 'star', 'cloud'];
     const sorted = [...sortedHand].sort((a, b) => {
@@ -907,7 +989,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
                     <div className="player-nickname">{player.nickname}</div>
                     <div className="player-coins">
                       <img src={coinImage} alt="코인" className="coin-icon" />
-                      코인수
+                      {player.score}
                     </div>
                   </div>
                 </div>
@@ -959,11 +1041,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
             {/* 좌측 - 내 정보 */}
             <div className="my-info">
               <div className="my-info-box">
-                <div className="my-nickname">닉네임</div>
+                <div className="my-nickname">
+                  {players.find(p => p.isCurrentPlayer)?.nickname || '닉네임'}
+                </div>
                 <div className="my-stats">
                   <span className="my-coins">
                     <img src={coinImage} alt="코인" className="coin-icon" />
-                    코인수
+                    {players.find(p => p.isCurrentPlayer)?.score || 0}
                   </span>
                   <span className="my-tiles">
                     <img src={cardImage} alt="카드" className="card-icon" />
@@ -993,22 +1077,34 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
                 >
                   {gameMode === 'easyMode' ? '초보모드' : '일반모드'}
                 </button>
+                <button 
+                  className="control-btn"
+                  onClick={() => {
+                    const room = ColyseusService.getRoom();
+                    if (room) {
+                      room.send("resetGame");
+                      console.log("게임 상태 초기화 요청");
+                    }
+                  }}
+                >
+                  게임 초기화
+                </button>
               </div>
             </div>
 
             {/* 우측 - Drop/Pass 버튼 */}
             <div className="action-buttons">
               <button 
-                className={`action-btn drop-btn ${showCardDealAnimation ? 'disabled' : ''}`} 
-                onClick={showCardDealAnimation ? undefined : handleSubmitCards}
-                disabled={showCardDealAnimation}
+                className={`action-btn drop-btn ${showCardDealAnimation || !isMyTurn() ? 'disabled' : ''}`} 
+                onClick={showCardDealAnimation || !isMyTurn() ? undefined : handleSubmitCards}
+                disabled={showCardDealAnimation || !isMyTurn()}
               >
                 Submit
               </button>
               <button 
-                className={`action-btn pass-btn ${showCardDealAnimation ? 'disabled' : ''}`} 
-                onClick={showCardDealAnimation ? undefined : handlePass}
-                disabled={showCardDealAnimation}
+                className={`action-btn pass-btn ${showCardDealAnimation || !isMyTurn() ? 'disabled' : ''}`} 
+                onClick={showCardDealAnimation || !isMyTurn() ? undefined : handlePass}
+                disabled={showCardDealAnimation || !isMyTurn()}
               >
                 Pass
               </button>
@@ -1028,13 +1124,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
                   } : showCardDealAnimation ? {
                     animationDelay: `${index * 0.12}s`
                   } : {}}
-                  onClick={showCardDealAnimation ? undefined : () => handleCardSelect(tile.id)}
-                  draggable={!isSorting && !showCardDealAnimation}
-                  onDragStart={showCardDealAnimation ? undefined : (e: React.DragEvent) => handleDragStart(e, tile.id)}
-                  onDragOver={showCardDealAnimation ? undefined : (e: React.DragEvent) => handleDragOver(e, index)}
-                  onDragLeave={showCardDealAnimation ? undefined : handleDragLeave}
-                  onDrop={showCardDealAnimation ? undefined : (e: React.DragEvent) => handleDrop(e, index)}
-                  onDragEnd={showCardDealAnimation ? undefined : handleDragEnd}
+                  onClick={showCardDealAnimation || !isMyTurn() ? undefined : () => handleCardSelect(tile.id)}
+                  draggable={!isSorting && !showCardDealAnimation && isMyTurn()}
+                  onDragStart={showCardDealAnimation || !isMyTurn() ? undefined : (e: React.DragEvent) => handleDragStart(e, tile.id)}
+                  onDragOver={showCardDealAnimation || !isMyTurn() ? undefined : (e: React.DragEvent) => handleDragOver(e, index)}
+                  onDragLeave={showCardDealAnimation || !isMyTurn() ? undefined : handleDragLeave}
+                  onDrop={showCardDealAnimation || !isMyTurn() ? undefined : (e: React.DragEvent) => handleDrop(e, index)}
+                  onDragEnd={showCardDealAnimation || !isMyTurn() ? undefined : handleDragEnd}
                 >
                   {/* 카드 분배 애니메이션 중에는 뒷면만 표시 */}
                   {showCardDealAnimation && !dealtCards.has(index) ? (

@@ -83,6 +83,13 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
   // 카드 초기화 (라운드 로빈 분배용)
   useEffect(() => {
     if (isVisible) {
+      console.log('CardDealAnimation 초기화:', {
+        isVisible,
+        playerCount,
+        cardsPerPlayer,
+        myPlayerIndex
+      });
+      
       const initialCards: Card[] = [];
       for (let i = 0; i < cardsPerPlayer; i++) {
         for (let playerIndex = 0; playerIndex < playerCount; playerIndex++) {
@@ -100,17 +107,24 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
       setDealtCount(0);
       setIsDealing(false);
       setShowCenterDeck(true);
+      
+      console.log('초기화된 카드 수:', initialCards.length);
     }
-  }, [isVisible, playerCount, cardsPerPlayer]);
+  }, [isVisible, playerCount, cardsPerPlayer, myPlayerIndex]);
 
   // 카드 분배 시작 (라운드 로빈)
   useEffect(() => {
     if (isVisible && cards.length > 0 && !isDealing) {
+      console.log('카드 분배 시작:', {
+        cardsLength: cards.length,
+        isDealing,
+        myPlayerIndex
+      });
       setIsDealing(true);
       startDealing();
     }
     // eslint-disable-next-line
-  }, [isVisible, cards.length, isDealing]);
+  }, [isVisible, cards.length, isDealing, myPlayerIndex]);
 
   const startDealing = () => {
     let currentIndex = 0;
@@ -150,7 +164,7 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
       
       setDealtCount(prev => prev + 1);
       currentIndex++;
-      setTimeout(dealNextCard, 120);
+      setTimeout(dealNextCard, 60);
     };
     dealNextCard();
   };
@@ -250,7 +264,17 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
     };
   };
 
-    if (!isVisible) return null;
+    if (!isVisible) {
+      console.log('CardDealAnimation 숨김');
+      return null;
+    }
+    
+    console.log('CardDealAnimation 렌더링:', {
+      cardsLength: cards.length,
+      isDealing,
+      myPlayerIndex,
+      playerCount
+    });
 
   return (
     <div className="card-deal-animation">
@@ -273,29 +297,35 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
               animate={{
                 x: card.isDealt ? targetPosition.x : centerPosition.x,
                 y: card.isDealt ? targetPosition.y : centerPosition.y,
-                rotateY: isMyCard ? (card.isFlipped ? 0 : 180) : 180,
+                rotateY: 180, // 내 카드도 항상 뒷면으로 유지
                 scale: 1,
-                opacity: card.isDealt ? (isMyCard ? 1 : (card.isArrived ? 0 : 1)) : (showCenterDeck ? 1 : 0)
+                opacity: card.isDealt ? (isMyCard ? (card.isArrived ? 0 : 0.3) : (card.isArrived ? 0 : 1)) : (showCenterDeck ? 1 : 0)
               }}
               transition={{
-                duration: 0.4,
+                duration: 0.25,
                 ease: 'easeOut',
                 opacity: { duration: 0 } // opacity는 즉시 변경 (애니메이션 없음)
               }}
               onAnimationComplete={() => {
-                if (isMyCard && card.isDealt && !card.isFlipped) {
-                  setCards(prev => prev.map((c) =>
-                    c.id === card.id ? { ...c, isFlipped: true } : c
-                  ));
-                  // hand-tile 활성화 콜백
-                  if (onMyCardDealt) {
-                    onMyCardDealt(card.cardIndex);
+                if (card.isDealt && !card.isArrived) {
+                  if (isMyCard) {
+                    // 내 카드가 목적지에 도착하면 isArrived를 true로 설정하여 완전히 사라지게 함
+                    setCards(prev => prev.map((c) =>
+                      c.id === card.id ? { ...c, isArrived: true } : c
+                    ));
+                    
+                    // hand-tile 활성화 콜백
+                    if (onMyCardDealt) {
+                      setTimeout(() => {
+                        onMyCardDealt(card.cardIndex);
+                      }, 200); // 200ms 지연
+                    }
+                  } else {
+                    // 다른 플레이어 카드만 isArrived를 true로 설정하여 사라지게 함
+                    setCards(prev => prev.map((c) =>
+                      c.id === card.id ? { ...c, isArrived: true } : c
+                    ));
                   }
-                } else if (!isMyCard && card.isDealt && !card.isArrived) {
-                  // 다른 플레이어 카드가 목적지에 도착하면 즉시 사라지도록 isArrived를 true로 설정
-                  setCards(prev => prev.map((c) =>
-                    c.id === card.id ? { ...c, isArrived: true } : c
-                  ));
                 }
               }}
               style={{
@@ -305,8 +335,8 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
             >
               {/* 카드 뒷면 */}
               <div className="card-back" />
-              {/* 내 카드만 앞면 */}
-              {isMyCard && card.isFlipped && (
+              {/* 내 카드 앞면 표시 로직 주석처리 */}
+              {/* {isMyCard && card.isFlipped && (
                 <div 
                   className={`card-front ${(() => {
                     const cardData = myHand[card.cardIndex];
@@ -332,7 +362,7 @@ const CardDealAnimation: React.FC<CardDealAnimationProps> = ({
                     })()}
                   </div>
                 </div>
-              )}
+              )} */}
             </motion.div>
           );
         })}

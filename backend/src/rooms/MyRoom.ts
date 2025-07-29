@@ -26,6 +26,7 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
   maxNumberMap: Record<number, number> = { 3: 9, 4: 13, 5: 15 };
 
   onCreate(options: any) {
+    console.log(`[DEBUG] 방 생성됨: ${this.roomId}`);
     this.onMessage("changeRounds", (client, data) => {
       if (client.sessionId !== this.state.host) {
         client.send("changeRejected", { reason: "Only the host can change rounds." });
@@ -93,7 +94,47 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       }
     });
 
+    // ------------------------------------------------------------------- 프론트엔드 관련 추가
+    // get 관련 함수 추가
+
+    // 게임 화면 진입 시 플레이어 정보 요청
+    this.onMessage("requestPlayerInfo", (client) => {
+      console.log(`플레이어 ${client.sessionId}가 플레이어 정보를 요청함`);
+      console.log(`[DEBUG] 현재 게임 상태: round=${this.state.round}, isGameStarted=${this.state.round > 0}`);
+      
+      // 모든 플레이어 정보 전송
+      const allPlayers = Array.from(this.state.players.entries()).map(([id, p]) => ({
+        sessionId: id,
+        nickname: p.nickname || '익명',
+        score: p.score || 0,
+        remainingTiles: p.hand ? p.hand.length : 0,
+        isCurrentPlayer: id === client.sessionId
+      }));
+      
+      // 현재 플레이어의 손패 정보도 포함
+      const myPlayer = this.state.players.get(client.sessionId);
+      const myHand = myPlayer && myPlayer.hand ? Array.from(myPlayer.hand) : [];
+      
+      console.log(`[DEBUG] 플레이어 손패: ${myHand.join(', ')}`);
+      
+      client.send("playerInfoResponse", {
+        players: allPlayers,
+        playerOrder: this.state.playerOrder.slice(),
+        isGameStarted: this.state.round > 0,
+        myHand: myHand,
+        maxNumber: this.state.maxNumber
+      });
+    });
+
     this.onMessage("playAgain", (client) => {
+      console.log(`[DEBUG] playAgain 요청: ${client.sessionId}`);
+      this.resetGameState();
+      this.broadcast("gameReset", {});
+    });
+
+    // 게임 상태 강제 초기화 (디버깅용)
+    this.onMessage("resetGame", (client) => {
+      console.log(`[DEBUG] 게임 상태 강제 초기화 요청: ${client.sessionId}`);
       this.resetGameState();
       this.broadcast("gameReset", {});
     });
@@ -101,29 +142,39 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     // ------------------------------------------------------------------- 프론트엔드 관련 추가 끝
 
     this.onMessage("start", (client, data) => {
+      console.log(`[DEBUG] start 메시지 수신: ${client.sessionId}`);
+      
       if (client.sessionId !== this.state.host) {
+        console.log(`[DEBUG] 호스트가 아님: ${client.sessionId} vs ${this.state.host}`);
         client.send("startRejected", { reason: "Only the host can start the game." });
         return;
       }
 
       if (this.state.players.size < 3) {
+        console.log(`[DEBUG] 플레이어 수 부족: ${this.state.players.size}`);
         client.send("startRejected", { reason: "Not enough players." });
         return;
       }
 
       for(const [sessionId, player] of this.state.players){
         if(!player.ready){
+          console.log(`[DEBUG] 준비되지 않은 플레이어: ${sessionId}`);
           client.send("startRejected", { reason: "There exists some players who are not ready. " });
+          return;
         }
       }
 
+      console.log(`[DEBUG] 게임 시작 조건 만족, startGame() 호출`);
       this.startGame();
+      console.log(`[DEBUG] startRound() 호출`);
       this.startRound();
+      console.log(`[DEBUG] gameStarted 브로드캐스트`);
       this.broadcast("gameStarted", { totalRounds: this.state.totalRounds, easyMode: this.state.easyMode });
     });
   }
 
   onJoin(client: Client) {
+    console.log(`[DEBUG] 플레이어 입장: ${client.sessionId}`);
 
     // ------------------------------------------------------------------- 프론트엔드 관련 추가
     // 새로고침 관련 수정 필요
@@ -141,12 +192,30 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       return;
     }
 
+    // ------------------------------------------------------------------- 프론트엔드 관련 추가
+    // 디버그할 때 확인용
+
+    // 게임이 진행 중일 때 새로운 플레이어 입장 거부
+    if (this.state.round > 0) {
+      console.log(`[DEBUG] 게임 진행 중 - 새로운 플레이어 입장 거부: ${client.sessionId}`);
+      client.send("joinRejected", { reason: "Game is already in progress." });
+      return;
+    }
+
     // ------------------------------------------------------------------- 프론트엔드 관련 추가 끝
 
     const player = new PlayerState();
     player.sessionId = client.sessionId;
     this.state.players.set(client.sessionId, player);
     this.state.playerOrder.unshift(client.sessionId);
+
+    // 게임이 진행 중일 때 새로운 플레이어가 입장하면 nowPlayerIndex 조정
+    if (this.state.round > 0) {
+      console.log(`[DEBUG] 게임 진행 중 새로운 플레이어 입장 - 기존 nowPlayerIndex: ${this.state.nowPlayerIndex}`);
+      // 새로운 플레이어가 맨 앞에 추가되었으므로 인덱스를 1씩 증가
+      this.state.nowPlayerIndex += 1;
+      console.log(`[DEBUG] nowPlayerIndex 조정됨: ${this.state.nowPlayerIndex}`);
+    }
 
     if (this.state.host === "") {
       this.state.host = client.sessionId;
@@ -203,6 +272,8 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
   }
 
   startRound() {
+    console.log(`[DEBUG] startRound() 호출됨 - round: ${this.state.round}, playerCount: ${this.state.players.size}`);
+    
     const maxNumber = this.state.maxNumber;
     const playerCount = this.state.players.size;
 
@@ -225,6 +296,8 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
 
     // 4) 구름 3 가진 플레이어 찾기 (playerOrder 기준)
     const cloud3PlayerId = findPlayerWithCloud3(this.state.players, maxNumber);
+    
+    console.log(`[DEBUG] 구름 3 검색 결과: playerId=${cloud3PlayerId}, maxNumber=${maxNumber}`);
 
     if (cloud3PlayerId === null) {
       console.error("[BUG] 구름3이 분배되지 않음! 코드 버그 점검 필요");
@@ -234,8 +307,12 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
 
     // 5) 그 플레이어 인덱스 추출
     const cloud3Index = cloud3PlayerId !== null ? order.indexOf(cloud3PlayerId) : 0;
+    
+    console.log(`[DEBUG] 구름 3 플레이어 인덱스: ${cloud3Index}, playerOrder: ${order.join(', ')}`);
 
     this.state.nowPlayerIndex = cloud3Index;
+    
+    console.log(`[DEBUG] 라운드 시작 - 구름3 플레이어: ${this.state.playerOrder[cloud3Index]}, nowPlayerIndex: ${cloud3Index}`);
 
     // 6) 기타 상태 초기화
     this.state.lastType = 0;
@@ -245,18 +322,37 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     this.state.lastPlayerIndex = -1;
 
     // 7) 카드 분배 후 각 플레이어마다 자신의 상태 보내기
+    console.log(`[DEBUG] roundStart 메시지 전송 시작 - 플레이어 수: ${this.state.playerOrder.length}`);
     for (const sessionId of this.state.playerOrder) {
       const player = this.state.players.get(sessionId);
-      if (!player) continue;
+      if (!player) {
+        console.log(`[DEBUG] 플레이어를 찾을 수 없음: ${sessionId}`);
+        continue;
+      }
 
       const client = this.clients.find(c => c.sessionId === sessionId);
-      if (!client) continue;
+      if (!client) {
+        console.log(`[DEBUG] 클라이언트를 찾을 수 없음: ${sessionId}`);
+        continue;
+      }
 
+      console.log(`[DEBUG] roundStart 메시지 전송: ${sessionId}`);
       client.send("roundStart", {
         hand: player.hand.slice(),  // ArraySchema -> 일반 배열로 변환
         score: player.score,
         nickname: player.nickname,
-        // 기타 필요한 정보
+        // ------------------------------------------------------------------- 프론트엔드 관련 추가
+        maxNumber: this.state.maxNumber,
+        // 모든 플레이어 정보 포함
+        allPlayers: Array.from(this.state.players.entries()).map(([id, p]) => ({
+          sessionId: id,
+          nickname: p.nickname || '익명',
+          score: p.score,
+          remainingTiles: p.hand ? p.hand.length : 0,
+          isCurrentPlayer: id === this.state.playerOrder[this.state.nowPlayerIndex]
+        }))
+        // ------------------------------------------------------------------- 프론트엔드 관련 추가 끝
+
       });
     }
 
@@ -269,6 +365,8 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
 
   nextPlayer() {
     this.state.nowPlayerIndex = (this.state.nowPlayerIndex + 1) % this.state.playerOrder.length;
+    console.log(`[DEBUG] 턴 변경 - 새로운 플레이어: ${this.state.playerOrder[this.state.nowPlayerIndex]}, nowPlayerIndex: ${this.state.nowPlayerIndex}`);
+    
     if(this.state.nowPlayerIndex === this.state.lastPlayerIndex) {
       this.state.lastType = 0;
       this.state.lastMadeType = MADE_NONE;
@@ -276,7 +374,18 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       this.state.lastCards = new ArraySchema<number>();
       this.broadcast("cycleEnded", {});
     }
-    // 턴 변경 시 추가 액션 처리 가능
+    
+    // 턴 변경 시 현재 플레이어 정보 업데이트
+    this.broadcast("turnChanged", {
+      currentPlayerId: this.state.playerOrder[this.state.nowPlayerIndex],
+      allPlayers: Array.from(this.state.players.entries()).map(([id, p]) => ({
+        sessionId: id,
+        nickname: p.nickname || '익명',
+        score: p.score,
+        remainingTiles: p.hand ? p.hand.length : 0,
+        isCurrentPlayer: id === this.state.playerOrder[this.state.nowPlayerIndex]
+      }))
+    });
   }
 
   endRound() {

@@ -19,9 +19,13 @@ export interface IMyRoom extends Room<MyRoomState> {
 // submit 메시지 처리
 export function handleSubmit(room: IMyRoom, client: Client, data: any) {
   const submitCards: number[] = data.submitCards.map((item: string) => parseInt(item, 10));
+  
+  console.log(`[DEBUG] 카드 제출 시도: player=${client.sessionId}, cards=${submitCards.join(', ')}`);
 
   // 턴 검사
+  console.log(`[DEBUG] 턴 검사: client=${client.sessionId}, currentPlayer=${room.state.playerOrder[room.state.nowPlayerIndex]}, nowPlayerIndex=${room.state.nowPlayerIndex}`);
   if (client.sessionId !== room.state.playerOrder[room.state.nowPlayerIndex]) {
+    console.log(`[DEBUG] 턴 거부: ${client.sessionId}는 현재 턴이 아님`);
     client.send("submitRejected", { reason: "Not your turn." });
     return;
   }
@@ -54,8 +58,10 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
   }
 
   // 카드 소유 여부 확인
+  console.log(`[DEBUG] 플레이어 손패: ${player.hand.join(', ')}`);
   for (const card of submitCards) {
     if (!player.hand.includes(card)) {
+      console.log(`[DEBUG] 카드 ${card}를 보유하지 않음!`);
       client.send("noCard", { reason: "You do not hold this card." });
       return;
     }
