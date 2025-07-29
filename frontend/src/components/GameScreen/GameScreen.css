@@ -74,6 +74,26 @@
   height: 6.5vh;
   flex: 1;
   box-shadow: 2px 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.player-info-box.current-turn {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border: 2px solid #ffc107;
+  box-shadow: 0 0 15px rgba(255, 193, 7, 0.3);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 15px rgba(255, 193, 7, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(255, 193, 7, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 15px rgba(255, 193, 7, 0.3);
+  }
 }
 
 .player-info {
@@ -541,14 +561,34 @@
 }
 
 .action-btn.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
+  opacity: 0.3 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  background: linear-gradient(135deg, #666666 0%, #444444 100%) !important;
+  color: #999999 !important;
+  transform: none !important;
+  box-shadow: none !important;
+  user-select: none !important;
 }
 
 .action-btn.disabled:hover {
-  transform: none;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  transform: none !important;
+  box-shadow: none !important;
+  background: linear-gradient(135deg, #666666 0%, #444444 100%) !important;
+  color: #999999 !important;
+  opacity: 0.3 !important;
+}
+
+.action-btn.disabled:active {
+  transform: none !important;
+  box-shadow: none !important;
+  background: linear-gradient(135deg, #666666 0%, #444444 100%) !important;
+  color: #999999 !important;
+  opacity: 0.3 !important;
+}
+
+.action-btn.disabled::before {
+  display: none !important;
 }
 
 /* 하단 하단 - 내 손패 및 정렬 버튼 */
@@ -603,6 +643,8 @@
   transform: translateY(-3px);
   box-shadow: 0 5px 12px rgba(0, 0, 0, 0.4);
 }
+
+
 
 .hand-tile.selected {
   transform: translateY(-5px);

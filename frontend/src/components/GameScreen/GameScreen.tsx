@@ -441,8 +441,34 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     const room = ColyseusService.getRoom();
     if (!room) return false;
     
+    // 백엔드 상태에서 직접 현재 플레이어 확인
+    if (room.state && room.state.playerOrder && room.state.nowPlayerIndex !== undefined) {
+      const currentPlayerSessionId = room.state.playerOrder[room.state.nowPlayerIndex];
+      const isMyTurn = currentPlayerSessionId === room.sessionId;
+      
+      // 디버깅을 위한 로그
+      console.log(`[DEBUG] isMyTurn 체크 - 백엔드 상태:`, {
+        playerOrder: room.state.playerOrder,
+        nowPlayerIndex: room.state.nowPlayerIndex,
+        currentPlayerSessionId,
+        mySessionId: room.sessionId,
+        isMyTurn
+      });
+      
+      return isMyTurn;
+    }
+    
+    // 백엔드 상태가 없으면 프론트엔드 상태로 확인
     const currentPlayer = players.find(p => p.isCurrentPlayer);
-    return currentPlayer && currentPlayer.sessionId === room.sessionId;
+    const isMyTurn = currentPlayer && currentPlayer.sessionId === room.sessionId;
+    
+    console.log(`[DEBUG] isMyTurn 체크 - 프론트엔드 상태:`, {
+      currentPlayer: currentPlayer?.nickname || '알 수 없음',
+      mySessionId: room.sessionId,
+      isMyTurn
+    });
+    
+    return isMyTurn;
   };
 
   // 카드 번호를 색상으로 변환
@@ -817,6 +843,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   };
 
   const handlePass = () => {
+    // 턴 체크 - 자신의 차례가 아니면 함수 실행 중단
+    if (!isMyTurn()) {
+      console.log('[DEBUG] handlePass - 자신의 차례가 아님, 함수 실행 중단');
+      return;
+    }
+    
     const room = ColyseusService.getRoom();
     if (room) {
       room.send('pass');
@@ -824,6 +856,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   };
 
   const handleSubmitCards = () => {
+    // 턴 체크 - 자신의 차례가 아니면 함수 실행 중단
+    if (!isMyTurn()) {
+      console.log('[DEBUG] handleSubmitCards - 자신의 차례가 아님, 함수 실행 중단');
+      return;
+    }
+    
     if (selectedCards.length === 0) {
       alert('제출할 카드를 선택해주세요.');
       return;
@@ -984,7 +1022,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
           <div className="other-players">
             {players.filter(player => !player.isCurrentPlayer).map((player, index) => (
               <div key={player.id} className="player-info-container">
-                <div className="player-info-box">
+                <div className={`player-info-box ${player.isCurrentPlayer ? 'current-turn' : ''}`}>
                   <div className="player-info">
                     <div className="player-nickname">{player.nickname}</div>
                     <div className="player-coins">
@@ -1040,7 +1078,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
           <div className="bottom-top">
             {/* 좌측 - 내 정보 */}
             <div className="my-info">
-              <div className="my-info-box">
+              <div className={`my-info-box ${players.find(p => p.isCurrentPlayer)?.sessionId === mySessionId ? 'current-turn' : ''}`}>
                 <div className="my-nickname">
                   {players.find(p => p.isCurrentPlayer)?.nickname || '닉네임'}
                 </div>
@@ -1096,15 +1134,31 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
             <div className="action-buttons">
               <button 
                 className={`action-btn drop-btn ${showCardDealAnimation || !isMyTurn() ? 'disabled' : ''}`} 
-                onClick={showCardDealAnimation || !isMyTurn() ? undefined : handleSubmitCards}
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (showCardDealAnimation || !isMyTurn()) {
+                    console.log('[DEBUG] Submit 버튼 클릭 - 비활성화 상태');
+                    return;
+                  }
+                  handleSubmitCards();
+                }}
                 disabled={showCardDealAnimation || !isMyTurn()}
+                title={!isMyTurn() ? '다른 플레이어의 차례입니다' : '카드를 제출합니다'}
               >
                 Submit
               </button>
               <button 
                 className={`action-btn pass-btn ${showCardDealAnimation || !isMyTurn() ? 'disabled' : ''}`} 
-                onClick={showCardDealAnimation || !isMyTurn() ? undefined : handlePass}
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (showCardDealAnimation || !isMyTurn()) {
+                    console.log('[DEBUG] Pass 버튼 클릭 - 비활성화 상태');
+                    return;
+                  }
+                  handlePass();
+                }}
                 disabled={showCardDealAnimation || !isMyTurn()}
+                title={!isMyTurn() ? '다른 플레이어의 차례입니다' : '패스합니다'}
               >
                 Pass
               </button>
@@ -1119,18 +1173,28 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
                 <div 
                   key={tile.id} 
                   className={`hand-tile ${getDisplayColor(tile.color, gameMode)} ${selectedCards.includes(tile.id) ? 'selected' : ''} ${draggedCard === tile.id ? 'dragging' : ''} ${isSorting ? 'sorting' : ''} ${showCardDealAnimation ? 'dealing' : ''} ${dealtCards.has(index) ? 'dealt' : ''}`}
-                  style={isSorting && cardOffsets[tile.id] !== undefined ? {
-                    transform: `translateX(${cardOffsets[tile.id]}px)`
-                  } : showCardDealAnimation ? {
-                    animationDelay: `${index * 0.12}s`
-                  } : {}}
-                  onClick={showCardDealAnimation || !isMyTurn() ? undefined : () => handleCardSelect(tile.id)}
-                  draggable={!isSorting && !showCardDealAnimation && isMyTurn()}
-                  onDragStart={showCardDealAnimation || !isMyTurn() ? undefined : (e: React.DragEvent) => handleDragStart(e, tile.id)}
-                  onDragOver={showCardDealAnimation || !isMyTurn() ? undefined : (e: React.DragEvent) => handleDragOver(e, index)}
-                  onDragLeave={showCardDealAnimation || !isMyTurn() ? undefined : handleDragLeave}
-                  onDrop={showCardDealAnimation || !isMyTurn() ? undefined : (e: React.DragEvent) => handleDrop(e, index)}
-                  onDragEnd={showCardDealAnimation || !isMyTurn() ? undefined : handleDragEnd}
+                  style={{
+                    ...(isSorting && cardOffsets[tile.id] !== undefined ? {
+                      transform: `translateX(${cardOffsets[tile.id]}px)`
+                    } : showCardDealAnimation ? {
+                      animationDelay: `${index * 0.12}s`
+                    } : {}),
+                    cursor: showCardDealAnimation ? 'not-allowed' : 'pointer'
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (showCardDealAnimation) {
+                      console.log('[DEBUG] 카드 클릭 - 카드 분배 애니메이션 중');
+                      return;
+                    }
+                    handleCardSelect(tile.id);
+                  }}
+                  draggable={!isSorting && !showCardDealAnimation}
+                  onDragStart={showCardDealAnimation ? undefined : (e: React.DragEvent) => handleDragStart(e, tile.id)}
+                  onDragOver={showCardDealAnimation ? undefined : (e: React.DragEvent) => handleDragOver(e, index)}
+                  onDragLeave={showCardDealAnimation ? undefined : handleDragLeave}
+                  onDrop={showCardDealAnimation ? undefined : (e: React.DragEvent) => handleDrop(e, index)}
+                  onDragEnd={showCardDealAnimation ? undefined : handleDragEnd}
                 >
                   {/* 카드 분배 애니메이션 중에는 뒷면만 표시 */}
                   {showCardDealAnimation && !dealtCards.has(index) ? (
