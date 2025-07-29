@@ -1366,30 +1366,49 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         {/* 상단 좌측 - 다른 플레이어 정보 */}
         <div className="top-left-section">
           <div className="other-players">
-            {players.filter(player => player.sessionId !== mySessionId).map((player, index) => {
-              // 현재 차례인 플레이어의 sessionId 찾기
+            {(() => {
               const room = ColyseusService.getRoom();
-              const currentPlayerSessionId = room?.state?.playerOrder?.[room?.state?.nowPlayerIndex];
-              const isCurrentTurn = player.sessionId === currentPlayerSessionId;
+              const playerOrder = room?.state?.playerOrder || [];
+              const nowPlayerIndex = room?.state?.nowPlayerIndex || 0;
+              const myIndex = playerOrder.indexOf(mySessionId);
               
-              return (
-                <div key={player.id} className="player-info-container">
-                  <div className={`player-info-box ${isCurrentTurn ? 'current-turn' : ''}`}>
-                    <div className="player-info">
-                      <div className="player-nickname">{player.nickname}</div>
-                      <div className="player-coins">
-                        <img src={coinImage} alt="코인" className="coin-icon" />
-                        {player.score}
+              // 다른 플레이어들을 playerOrder 순서대로 정렬
+              const otherPlayers = players.filter(player => player.sessionId !== mySessionId);
+              const sortedOtherPlayers = otherPlayers.sort((a, b) => {
+                const aIndex = playerOrder.indexOf(a.sessionId);
+                const bIndex = playerOrder.indexOf(b.sessionId);
+                
+                // 현재 차례 기준으로 상대적 위치 계산
+                const aRelativeIndex = (aIndex - nowPlayerIndex + playerOrder.length) % playerOrder.length;
+                const bRelativeIndex = (bIndex - nowPlayerIndex + playerOrder.length) % playerOrder.length;
+                
+                return aRelativeIndex - bRelativeIndex;
+              });
+              
+              return sortedOtherPlayers.map((player, index) => {
+                // 현재 차례인 플레이어의 sessionId 찾기
+                const currentPlayerSessionId = playerOrder[nowPlayerIndex];
+                const isCurrentTurn = player.sessionId === currentPlayerSessionId;
+                
+                return (
+                  <div key={player.id} className="player-info-container">
+                    <div className={`player-info-box ${isCurrentTurn ? 'current-turn' : ''}`}>
+                      <div className="player-info">
+                        <div className="player-nickname">{player.nickname}</div>
+                        <div className="player-coins">
+                          <img src={coinImage} alt="코인" className="coin-icon" />
+                          {player.score}
+                        </div>
                       </div>
                     </div>
+                    <div className="remaining-tiles-count">
+                      <img src={cardImage} alt="카드" className="card-icon" />
+                      <AnimatedRemainingTiles count={player.remainingTiles} />
+                    </div>
                   </div>
-                  <div className="remaining-tiles-count">
-                    <img src={cardImage} alt="카드" className="card-icon" />
-                    <AnimatedRemainingTiles count={player.remainingTiles} />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
         </div>
 
