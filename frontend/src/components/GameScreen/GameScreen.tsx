@@ -69,6 +69,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     isNew: boolean;
     row: number;
     col: number;
+    playerId?: string;
   }>>([]);
   const [sortedHand, setSortedHand] = useState<Array<{
     id: number;
@@ -97,7 +98,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   const [cardOffsets, setCardOffsets] = useState<{ [key: number]: number }>({});
   const handRef = useRef<HTMLDivElement>(null);
   
-  // 대기 중인 패 저장 (공간 부족으로 제출하지 못한 패)
+  // 대기 중인 패 저장 (공간 부족으로 제출하지 못한 패) - 더 이상 사용하지 않음
   const [pendingCards, setPendingCards] = useState<Array<{
     id: number;
     value: number;
@@ -294,7 +295,42 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     room.onMessage('submitted', (message) => {
       console.log('카드 제출:', message);
       
-      // 내가 카드를 제출했을 때 손패에서 제거
+      // 모든 플레이어가 낸 패를 게임 보드에 표시
+      const submittedCards = message.cards.map((cardNumber: number, index: number) => {
+        const color = getCardColorFromNumber(cardNumber);
+        const value = getCardValueFromNumber(cardNumber);
+        return {
+          id: Date.now() + index + Math.random(), // 고유 ID 생성
+          value: value,
+          color: color,
+          playerId: message.playerId // 어떤 플레이어가 낸 패인지 저장
+        };
+      });
+      
+      // 게임 보드에 직접 추가 (pendingCards 대신)
+      setBoardCards(prev => {
+        // 기존 카드들과 중복 체크
+        const newCards = submittedCards.filter((newCard: any) => 
+          !prev.some(existingCard => 
+            existingCard.value === newCard.value && 
+            existingCard.color === newCard.color &&
+            existingCard.playerId === newCard.playerId
+          )
+        );
+        
+        // 고정된 위치에 배치 (모든 플레이어에게 동일한 위치)
+        const fixedPosition = getFixedCardPosition(prev.length, newCards.length);
+        const positionedCards = newCards.map((card: any, index: number) => ({
+          ...card,
+          row: fixedPosition.row,
+          col: fixedPosition.col + index,
+          isNew: true
+        }));
+        
+        return [...prev, ...positionedCards];
+      });
+      
+      // 내가 카드를 제출했을 때만 손패에서 제거
       if (message.playerId === room.sessionId) {
         // 백엔드에서 제출된 카드들을 손패에서 제거
         const room = ColyseusService.getRoom();
@@ -319,27 +355,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
             setVisibleHand(handCards); // visibleHand도 직접 업데이트
           }
         }
-        
-        // 제출된 카드들을 pendingCards에 추가하여 게임 보드에 배치
-        const submittedCards = message.cards.map((cardNumber: number, index: number) => {
-          const color = getCardColorFromNumber(cardNumber);
-          const value = getCardValueFromNumber(cardNumber);
-          return {
-            id: Date.now() + index, // 고유 ID 생성
-            value: value,
-            color: color
-          };
-        });
-        
-        // 중복 방지를 위해 기존 pendingCards와 비교
-        setPendingCards(prev => {
-          const newCards = submittedCards.filter((newCard: any) => 
-            !prev.some((existingCard: any) => 
-              existingCard.value === newCard.value && existingCard.color === newCard.color
-            )
-          );
-          return [...prev, ...newCards];
-        });
       }
       
       // 백엔드 상태로부터 모든 플레이어의 남은 카드 수 동기화
@@ -375,6 +390,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         lastMadeType: 0,
         lastHighestValue: 0
       });
+      
+      // 게임 보드 초기화
+      setBoardCards([]);
     });
 
     room.onMessage('turnChanged', (message) => {
@@ -545,6 +563,17 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     const maxNumber = room?.state?.maxNumber || 13;
     const { type, number } = parseCard(cardNumber, maxNumber);
     return getValue(number, type, maxNumber);
+  };
+
+  // 고정된 카드 위치를 계산하는 함수 (모든 플레이어에게 동일한 위치)
+  const getFixedCardPosition = (currentCardCount: number, newCardCount: number): { row: number; col: number } => {
+    // 간단한 배치 로직: 왼쪽에서 오른쪽으로, 위에서 아래로
+    const cardsPerRow = 15; // boardSize.cols
+    const totalCards = currentCardCount + newCardCount;
+    const row = Math.floor(totalCards / cardsPerRow);
+    const col = totalCards % cardsPerRow;
+    
+    return { row, col };
   };
 
   // 백엔드의 parseCard 함수와 동일한 로직
@@ -961,14 +990,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     setIsProcessingPendingCards(false);
   };
 
-  // 보드 크기가 변경될 때 대기 중인 패 자동 제출
-  useEffect(() => {
-    if (pendingCards.length > 0 && !isProcessingPendingCards) {
-      console.log('useEffect: pendingCards 변경 감지, submitPendingCards 호출');
-      // pendingCards가 추가되거나 보드 크기가 변경될 때 즉시 제출 시도
-      submitPendingCards();
-    }
-  }, [boardSize, pendingCards, isProcessingPendingCards]);
+  // 보드 크기가 변경될 때 대기 중인 패 자동 제출 - 더 이상 사용하지 않음
+  // useEffect(() => {
+  //   if (pendingCards.length > 0 && !isProcessingPendingCards) {
+  //     console.log('useEffect: pendingCards 변경 감지, submitPendingCards 호출');
+  //     // pendingCards가 추가되거나 보드 크기가 변경될 때 즉시 제출 시도
+  //     submitPendingCards();
+  //   }
+  // }, [boardSize, pendingCards, isProcessingPendingCards]);
 
   const handlePlayerCardReceived = (playerIndex: number) => {
     setPlayers(prev => prev.map((player, index) => 
