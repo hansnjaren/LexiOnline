@@ -30,4 +30,10 @@ export class MyRoomState extends Schema {
 
   @type("int8") maxNumber = 0;
 
+  // 게임 보드 상태 추적
+  @type([ "int8" ]) boardCards = new ArraySchema<number>(); // 카드 번호들
+  @type([ "int8" ]) boardRows = new ArraySchema<number>(); // 각 카드의 행 위치
+  @type([ "int8" ]) boardCols = new ArraySchema<number>(); // 각 카드의 열 위치
+  @type([ "int8" ]) boardTurnIds = new ArraySchema<number>(); // 각 카드의 턴 ID
+
 }

@@ -124,14 +124,32 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
   const boardSize = { rows: 4, cols: 15 }; // 기본 보드 크기
   const currentTurnId = room.state.round; // 턴 ID로 라운드 번호 사용
   
-  // 현재 게임 보드 상태 (실제로는 room.state에 저장되어야 함)
+  // 게임 보드 동기화 관련
+  // 현재 게임 보드 상태를 room.state에서 가져오기
   const boardCards: Array<{ row: number; col: number; turnId: number }> = [];
+  for (let i = 0; i < room.state.boardCards.length; i++) {
+    boardCards.push({
+      row: room.state.boardRows[i],
+      col: room.state.boardCols[i],
+      turnId: room.state.boardTurnIds[i]
+    });
+  }
   
   // 위치 결정
   const positionResult = findCardPosition(submitCards, boardCards, boardSize, currentTurnId);
   
   if (positionResult.success && positionResult.position) {
     console.log(`[DEBUG] 카드 위치 결정: row=${positionResult.position.row}, col=${positionResult.position.col}`);
+    
+    // 게임 보드 동기화 관련
+    // 게임 보드 상태에 새로운 카드들 추가
+    for (let i = 0; i < submitCards.length; i++) {
+      room.state.boardCards.push(submitCards[i]);
+      room.state.boardRows.push(positionResult.position!.row);
+      room.state.boardCols.push(positionResult.position!.col + i);
+      room.state.boardTurnIds.push(currentTurnId);
+    }
+    
     room.broadcast("submitted", { 
       cards: submitCards, 
       playerId: client.sessionId,
@@ -141,10 +159,21 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
   } else {
     console.log(`[DEBUG] 카드 위치 결정 실패, 기본 위치 사용`);
     // 위치를 찾지 못한 경우 기본 위치 사용
+    const defaultPosition = { row: 0, col: 0 };
+    
+    // 게임 보드 동기화 관련
+    // 게임 보드 상태에 새로운 카드들 추가
+    for (let i = 0; i < submitCards.length; i++) {
+      room.state.boardCards.push(submitCards[i]);
+      room.state.boardRows.push(defaultPosition.row);
+      room.state.boardCols.push(defaultPosition.col + i);
+      room.state.boardTurnIds.push(currentTurnId);
+    }
+    
     room.broadcast("submitted", { 
       cards: submitCards, 
       playerId: client.sessionId,
-      position: { row: 0, col: 0 }, // 기본 위치
+      position: defaultPosition,
       maxNumber: room.state.maxNumber
     });
   }
@@ -286,19 +315,18 @@ function findCardPosition(
       
       if (!canPlace) continue;
       
-      // 2. 여백 조건 확인 - 다른 턴의 패와는 반드시 1칸 이상 여백
+      // 2. 좌측 여백 확인 (새로운 카드들 왼쪽에 기존 카드가 있으면 반드시 한 칸 이상 여백 필요)
       const leftCard = rowCards.find(c => c.col === startCol - 1);
+      if (leftCard) {
+        canPlace = false;
+        continue;
+      }
+      
+      // 3. 우측 여백 확인 (새로운 카드들 오른쪽에 기존 카드가 있으면 반드시 한 칸 이상 여백 필요)
       const rightCard = rowCards.find(c => c.col === startCol + newCards.length);
-      
-      // 같은 턴의 카드인지 확인
-      const isSameTurn = leftCard?.turnId === currentTurnId || rightCard?.turnId === currentTurnId;
-      
-      if (!isSameTurn) {
-        // 다른 턴의 카드와는 반드시 여백이 있어야 함 (좌우 1칸 이상)
-        if (leftCard || rightCard) {
-          canPlace = false;
-          continue;
-        }
+      if (rightCard) {
+        canPlace = false;
+        continue;
       }
       
       if (canPlace) {
