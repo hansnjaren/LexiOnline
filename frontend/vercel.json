@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/auth/google",
+      "destination": "https://api.lexionline.minsung.kr/api/auth/google"
+    }, 
+    {
+      "source": "/api/userinfo",
+      "destination": "https://api.lexionline.minsung.kr/api/userinfo"
+    }
+  ]
+}
