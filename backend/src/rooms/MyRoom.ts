@@ -375,8 +375,9 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       const player = this.state.players.get(sessionId);
       if (player) {
         player.hand = new ArraySchema<number>(...hands[i]);
-        // 새로운 라운드이므로 정렬 순서 초기화
+        // 새로운 라운드이므로 정렬 순서 초기화 (새로운 손패가 들어오므로)
         player.sortedHand.clear();
+        console.log(`[DEBUG] startRound - 플레이어 ${sessionId}의 sortedHand 초기화`);
       }
     });
 

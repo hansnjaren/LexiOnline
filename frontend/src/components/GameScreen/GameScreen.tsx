@@ -217,7 +217,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         // 게임이 이미 시작되었고 손패가 있다면 손패만 업데이트 (애니메이션 없이)
         // 단, 모드 변경 중일 때는 정렬 순서를 보호하기 위해 업데이트하지 않음
         const myPlayer = state.players.get(room.sessionId);
-        if (myPlayer && myPlayer.hand && myPlayer.hand.length > 0 && !showCardDealAnimation && !isModeChangingRef.current && !hasBeenSortedRef.current) {
+        if (myPlayer && myPlayer.hand && myPlayer.hand.length > 0 && !showCardDealAnimation && !isModeChangingRef.current) {
           console.log('[DEBUG] onStateChange - hasBeenSortedRef.current:', hasBeenSortedRef.current);
           console.log('[DEBUG] onStateChange - isModeChangingRef.current:', isModeChangingRef.current);
           console.log('[DEBUG] onStateChange - showCardDealAnimation:', showCardDealAnimation);
@@ -242,19 +242,41 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
           
           setMyHand(handCards);
           
-          // sortedHand가 이미 정렬된 상태라면 그 순서를 유지
-          if (sortedHand.length > 0 && sortedHand.length === handCards.length) {
+          // 백엔드에서 정렬된 순서가 있으면 사용, 없으면 기존 로직 사용
+          if (myPlayer.sortedHand && myPlayer.sortedHand.length > 0) {
+            // 백엔드의 정렬된 순서를 사용
+            const sortedCardNumbers = Array.from(myPlayer.sortedHand);
+            console.log('[DEBUG] onStateChange - 백엔드에서 받은 정렬된 순서:', sortedCardNumbers);
+            
+            const sortedHandCards = sortedCardNumbers.map((cardNumber: any, index: number) => {
+              const color = getCardColorFromNumber(cardNumber, maxNumber);
+              const value = getCardValueFromNumber(cardNumber, maxNumber);
+              return {
+                id: index,
+                value: value,
+                color: color,
+                originalNumber: cardNumber
+              };
+            });
+            
+            setSortedHand(sortedHandCards);
+            // myHand도 sortedHand와 동기화
+            setMyHand(sortedHandCards);
+            hasBeenSortedRef.current = true; // 정렬된 상태로 설정
+            console.log('[DEBUG] onStateChange - 백엔드 정렬 순서로 sortedHand 업데이트:', sortedHandCards.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+            console.log('[DEBUG] onStateChange - myHand도 sortedHand와 동기화됨');
+          } else if (sortedHand.length > 0 && sortedHand.length === handCards.length && hasBeenSortedRef.current) {
             // 기존 sortedHand의 순서를 유지하면서 새로운 카드 정보로 업데이트
             const updatedSortedHand = sortedHand.map((existingCard: any) => {
               const newCard = handCards.find((card: any) => card.originalNumber === existingCard.originalNumber);
               return newCard || existingCard;
             });
             setSortedHand(updatedSortedHand);
-            console.log('[DEBUG] 기존 정렬 순서 유지하여 sortedHand 업데이트:', updatedSortedHand.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+            console.log('[DEBUG] onStateChange - 기존 정렬 순서 유지하여 sortedHand 업데이트:', updatedSortedHand.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
           } else {
             // 처음이거나 카드 개수가 변경된 경우 초기 상태로 설정
             setSortedHand(handCards);
-            console.log('[DEBUG] 초기 상태로 sortedHand 설정:', handCards.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+            console.log('[DEBUG] onStateChange - 초기 상태로 sortedHand 설정:', handCards.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
           }
           
           setVisibleHand(handCards);
@@ -297,10 +319,30 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         });
         
         setMyHand(handCards);
-        hasBeenSortedRef.current = false; // 새 게임 시작 시 정렬 상태 리셋
         
-        // sortedHand가 이미 정렬된 상태라면 그 순서를 유지
-        if (sortedHand.length > 0 && sortedHand.length === handCards.length) {
+        // 백엔드에서 정렬된 순서가 있으면 사용, 없으면 기존 로직 사용
+        const room = ColyseusService.getRoom();
+        const myPlayer = room?.state?.players?.get(room.sessionId);
+        if (myPlayer?.sortedHand && myPlayer.sortedHand.length > 0) {
+          // 백엔드의 정렬된 순서를 사용
+          const sortedCardNumbers = Array.from(myPlayer.sortedHand);
+          console.log('[DEBUG] playerInfoResponse - 백엔드에서 받은 정렬된 순서:', sortedCardNumbers);
+          
+          const sortedHandCards = sortedCardNumbers.map((cardNumber: any, index: number) => {
+            const color = getCardColorFromNumber(cardNumber, maxNumber);
+            const value = getCardValueFromNumber(cardNumber, maxNumber);
+            return {
+              id: index,
+              value: value,
+              color: color,
+              originalNumber: cardNumber
+            };
+          });
+          
+          setSortedHand(sortedHandCards);
+          hasBeenSortedRef.current = true; // 정렬된 상태로 설정
+          console.log('[DEBUG] playerInfoResponse - 백엔드 정렬 순서로 sortedHand 설정:', sortedHandCards.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+        } else if (sortedHand.length > 0 && sortedHand.length === handCards.length && hasBeenSortedRef.current) {
           // 기존 sortedHand의 순서를 유지하면서 새로운 카드 정보로 업데이트
           const updatedSortedHand = sortedHand.map((existingCard: any) => {
             const newCard = handCards.find((card: any) => card.originalNumber === existingCard.originalNumber);
@@ -311,6 +353,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         } else {
           // 처음이거나 카드 개수가 변경된 경우 초기 상태로 설정
           setSortedHand(handCards);
+          hasBeenSortedRef.current = false; // 새 게임 시작 시 정렬 상태 리셋
           console.log('[DEBUG] playerInfoResponse - 초기 상태로 sortedHand 설정:', handCards.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
         }
         
@@ -368,6 +411,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     // 정렬 순서 저장 응답
     room.onMessage('sortOrderSaved', (message) => {
       console.log('[DEBUG] 정렬 순서 저장 완료:', message);
+      console.log('[DEBUG] 현재 sortedHand 상태:', sortedHand.map(c => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
     });
 
     room.onMessage('sortOrderRejected', (message) => {
@@ -405,10 +449,34 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         });
         
         setMyHand(handCards);
-        setSortedHand(handCards);
-        hasBeenSortedRef.current = false; // 새 라운드 시작 시 정렬 상태 리셋
         
-        console.log('[DEBUG] roundStart sortedHand 업데이트 완료:', handCards.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+        // 백엔드에서 정렬된 순서가 있으면 사용, 없으면 초기 순서 사용
+        const room = ColyseusService.getRoom();
+        if (room && room.state.players.get(room.sessionId)?.sortedHand?.length > 0) {
+          // 백엔드의 정렬된 순서를 사용
+          const sortedCardNumbers = Array.from(room.state.players.get(room.sessionId)!.sortedHand);
+          console.log('[DEBUG] roundStart - 백엔드에서 받은 정렬된 순서:', sortedCardNumbers);
+          
+          const sortedHandCards = sortedCardNumbers.map((cardNumber: any, index: number) => {
+            const color = getCardColorFromNumber(cardNumber, maxNumber);
+            const value = getCardValueFromNumber(cardNumber, maxNumber);
+            return {
+              id: index,
+              value: value,
+              color: color,
+              originalNumber: cardNumber
+            };
+          });
+          
+          setSortedHand(sortedHandCards);
+          hasBeenSortedRef.current = true; // 정렬된 상태로 설정
+          console.log('[DEBUG] roundStart - 백엔드 정렬 순서로 sortedHand 설정:', sortedHandCards.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+        } else {
+          // 백엔드에 정렬된 순서가 없으면 초기 순서 사용
+          setSortedHand(handCards);
+          hasBeenSortedRef.current = false; // 새 라운드 시작 시 정렬 상태 리셋
+          console.log('[DEBUG] roundStart - 초기 순서로 sortedHand 설정:', handCards.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+        }
         
         // 카드 분배 애니메이션 시작
         setShowCardDealAnimation(true);
@@ -496,6 +564,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         if (room) {
           const myPlayer = room.state.players.get(room.sessionId);
           if (myPlayer && myPlayer.hand) {
+            console.log('[DEBUG] submitted - 백엔드 sortedHand 상태:', Array.from(myPlayer.sortedHand || []));
+            console.log('[DEBUG] submitted - 백엔드 hand 상태:', Array.from(myPlayer.hand));
             // 백엔드의 손패를 기반으로 프론트엔드 손패 업데이트 (애니메이션 없이)
             const maxNumber = room.state.maxNumber || 13;
             console.log('[DEBUG] submitted room.state.maxNumber:', room.state.maxNumber);
@@ -522,8 +592,34 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
             console.log('[DEBUG] submitted - hasBeenSortedRef.current를 true로 설정');
             
             // 정렬된 순서를 유지하면서 새로운 손패로 업데이트
-            if (sortedHand.length > 0 && sortedHand.length >= handCards.length) {
-              // 제출된 카드들의 originalNumber 목록
+            console.log('[DEBUG] submitted - 조건 확인: sortedHand.length =', sortedHand.length, ', handCards.length =', handCards.length);
+            console.log('[DEBUG] submitted - sortedHand 내용:', sortedHand.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+            console.log('[DEBUG] submitted - handCards 내용:', handCards.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+            
+            // 백엔드의 sortedHand를 우선적으로 사용
+            if (myPlayer.sortedHand && myPlayer.sortedHand.length > 0) {
+              // 백엔드의 정렬된 순서를 사용
+              const sortedCardNumbers = Array.from(myPlayer.sortedHand);
+              console.log('[DEBUG] submitted - 백엔드에서 받은 정렬된 순서:', sortedCardNumbers);
+              
+              const sortedHandCards = sortedCardNumbers.map((cardNumber: any, index: number) => {
+                const color = getCardColorFromNumber(cardNumber, maxNumber);
+                const value = getCardValueFromNumber(cardNumber, maxNumber);
+                return {
+                  id: index,
+                  value: value,
+                  color: color,
+                  originalNumber: cardNumber
+                };
+              });
+              
+                          setSortedHand(sortedHandCards);
+            // myHand도 sortedHand와 동기화
+            setMyHand(sortedHandCards);
+            console.log('[DEBUG] submitted - 백엔드 정렬 순서로 sortedHand 업데이트:', sortedHandCards.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+            console.log('[DEBUG] submitted - myHand도 sortedHand와 동기화됨');
+            } else if (sortedHand.length > 0) {
+              // 백엔드에 sortedHand가 없지만 프론트엔드에 있는 경우, 제출된 카드들을 제거
               const submittedCardNumbers = message.cards;
               console.log('[DEBUG] submitted - 제출된 카드 번호들:', submittedCardNumbers);
               
@@ -539,11 +635,17 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
                 }));
               
               setSortedHand(updatedSortedHand);
+              // myHand도 sortedHand와 동기화
+              setMyHand(updatedSortedHand);
               console.log('[DEBUG] submitted - 정렬 순서 유지하여 sortedHand 업데이트 (빈 자리 채움):', updatedSortedHand.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+              console.log('[DEBUG] submitted - myHand도 sortedHand와 동기화됨 (빈 자리 채움)');
             } else {
               // sortedHand가 비어있는 경우에만 초기 상태로 설정
               setSortedHand(handCards);
+              // myHand도 sortedHand와 동기화
+              setMyHand(handCards);
               console.log('[DEBUG] submitted - sortedHand가 비어있어서 초기 상태로 설정:', handCards.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+              console.log('[DEBUG] submitted - myHand도 sortedHand와 동기화됨 (초기 상태)');
             }
             
             setVisibleHand(handCards);
@@ -1464,13 +1566,22 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     if (room) {
       const cardNumbers = newHand.map(card => card.originalNumber);
       console.log('[DEBUG] 드래그 앤 드롭 - 백엔드로 보내는 cardNumbers:', cardNumbers);
+      console.log('[DEBUG] 드래그 앤 드롭 - 변경 전 sortedHand:', sortedHand.map(c => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+      console.log('[DEBUG] 드래그 앤 드롭 - 변경 후 newHand:', newHand.map(c => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
       room.send('sortOrder', { sortOrder: cardNumbers });
+      
+      // 정렬 완료 표시를 즉시 설정
+      hasBeenSortedRef.current = true;
+      console.log('[DEBUG] 드래그 앤 드롭 - hasBeenSortedRef를 true로 설정 (즉시)');
     }
     
     setSortedHand(newHand);
+    // myHand도 sortedHand와 동기화
+    setMyHand(newHand);
     setDraggedCard(null);
     setDragOverIndex(null);
     setIsDragging(false);
+    console.log('[DEBUG] 드래그 앤 드롭 - myHand도 sortedHand와 동기화됨');
   };
 
   // 드래그 엔드 핸들러
@@ -1607,51 +1718,53 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   const handleSortByNumber = () => {
     setIsSorting(true);
     
-    console.log('[DEBUG] 숫자 정렬 시작 - 현재 sortedHand:', sortedHand.map((c, i) => ({ index: i, id: c.id, value: c.value, color: c.color })));
-    
     // 정렬된 순서 계산
     const sorted = [...sortedHand].sort((a, b) => a.value - b.value);
-    console.log('[DEBUG] 숫자 정렬 - 정렬된 결과:', sorted.map((c, i) => ({ index: i, id: c.id, value: c.value, color: c.color })));
     
     // 백엔드에 정렬 순서 저장 - 실제 카드 번호 사용
     const room = ColyseusService.getRoom();
     if (room) {
       const cardNumbers = sorted.map(card => card.originalNumber);
-      console.log('[DEBUG] 숫자 정렬 - 백엔드로 보내는 cardNumbers:', cardNumbers);
       room.send('sortOrder', { sortOrder: cardNumbers });
+      
+      // 정렬 완료 표시를 즉시 설정
+      hasBeenSortedRef.current = true;
+      console.log('[DEBUG] 숫자 정렬 - hasBeenSortedRef를 true로 설정 (즉시)');
     }
     
     // 각 카드의 이동 거리 계산
     const offsets: { [key: number]: number } = {};
-    console.log('[DEBUG] 숫자 정렬 - 카드 이동 거리 계산 시작');
-    sortedHand.forEach((card, currentIndex) => {
-      const newIndex = sorted.findIndex(c => c.id === card.id);
-      console.log(`[DEBUG] 카드 ${card.id} (${card.value}): 현재 위치 ${currentIndex} -> 새 위치 ${newIndex}`);
+
+    // sorted 배열의 순서대로 각 위치에 어떤 카드가 올지 계산
+    sorted.forEach((sortedCard, targetIndex) => {
+      // sortedHand 배열에서 같은 id를 가진 카드의 현재 위치를 찾기
+      const currentIndex = sortedHand.findIndex(c => c.id === sortedCard.id);
       
-      if (newIndex !== currentIndex) {
+      if (currentIndex !== targetIndex && currentIndex !== -1) {
         // 카드 간격을 동적으로 계산 (카드 너비 + gap)
         const cardWidth = handRef.current ? handRef.current.children[0]?.clientWidth || 0 : 0;
         const gap = 6; // CSS에서 설정된 gap
         const cardSpacing = cardWidth + gap;
-        const offset = (newIndex - currentIndex) * cardSpacing + 6;
-        offsets[card.id] = offset;
-        console.log(`[DEBUG] 카드 ${card.id} 이동 거리: ${offset}px (cardWidth: ${cardWidth}, gap: ${gap}, cardSpacing: ${cardSpacing})`);
-      } else {
-        console.log(`[DEBUG] 카드 ${card.id} 이동 없음`);
+        const offset = (targetIndex - currentIndex) * cardSpacing + 6;
+        offsets[currentIndex] = offset; // 현재 위치를 키로 사용
       }
     });
     
-    console.log('[DEBUG] 숫자 정렬 - 최종 offsets:', offsets);
     setCardOffsets(offsets);
     
     // 애니메이션 완료 후 배열 업데이트
     setTimeout(() => {
-      console.log('[DEBUG] 숫자 정렬 - 애니메이션 완료, sortedHand 업데이트');
-      setSortedHand(sorted);
+      // id 값을 유지하면서 정렬된 순서로 업데이트
+      const updatedSorted = sorted.map((card, newIndex) => ({
+        ...card,
+        id: newIndex // 새로운 인덱스로 id 업데이트
+      }));
+      
+      setSortedHand(updatedSorted);
+      // myHand도 sortedHand와 동기화
+      setMyHand(updatedSorted);
       setCardOffsets({});
       setIsSorting(false);
-      hasBeenSortedRef.current = true; // 정렬 완료 표시
-      console.log('[DEBUG] 숫자 정렬 - hasBeenSortedRef를 true로 설정');
     }, 800); // CSS 애니메이션 시간과 맞춤
   };
 
@@ -1682,28 +1795,39 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     if (room) {
       const cardNumbers = sorted.map(card => card.originalNumber);
       console.log('[DEBUG] 색상 정렬 - 백엔드로 보내는 cardNumbers:', cardNumbers);
+      console.log('[DEBUG] 색상 정렬 - 현재 sortedHand:', sortedHand.map(c => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+      console.log('[DEBUG] 색상 정렬 - 정렬된 결과:', sorted.map(c => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
       room.send('sortOrder', { sortOrder: cardNumbers });
+      
+      // 정렬 완료 표시를 즉시 설정
+      hasBeenSortedRef.current = true;
+      console.log('[DEBUG] 색상 정렬 - hasBeenSortedRef를 true로 설정 (즉시)');
     }
     
     // 각 카드의 이동 거리 계산
     const offsets: { [key: number]: number } = {};
     console.log('[DEBUG] 색상 정렬 - 카드 이동 거리 계산 시작');
-    sortedHand.forEach((card, currentIndex) => {
-      const newIndex = sorted.findIndex(c => c.id === card.id);
-      console.log(`[DEBUG] 카드 ${card.id} (${card.value}, ${card.color}): 현재 위치 ${currentIndex} -> 새 위치 ${newIndex}`);
+    // 디버깅을 위한 상세 로그
+    console.log('[DEBUG] === 색상 정렬 애니메이션 디버깅 ===');
+    console.log('[DEBUG] 현재 sortedHand:', sortedHand.map((c, i) => ({ index: i, id: c.id, value: c.value, color: c.color })));
+    console.log('[DEBUG] 정렬된 sorted:', sorted.map((c, i) => ({ index: i, id: c.id, value: c.value, color: c.color })));
+    
+    // sorted 배열의 순서대로 각 위치에 어떤 카드가 올지 계산
+    sorted.forEach((sortedCard, targetIndex) => {
+      // sortedHand 배열에서 같은 id를 가진 카드의 현재 위치를 찾기
+      const currentIndex = sortedHand.findIndex(c => c.id === sortedCard.id);
       
-      if (newIndex !== currentIndex) {
+      if (currentIndex !== targetIndex && currentIndex !== -1) {
         // 카드 간격을 동적으로 계산 (카드 너비 + gap)
         const cardWidth = handRef.current ? handRef.current.children[0]?.clientWidth || 0 : 0;
         const gap = 6; // CSS에서 설정된 gap
         const cardSpacing = cardWidth + gap;
-        const offset = (newIndex - currentIndex) * cardSpacing;
-        offsets[card.id] = offset;
-        console.log(`[DEBUG] 카드 ${card.id} 이동 거리: ${offset}px (cardWidth: ${cardWidth}, gap: ${gap}, cardSpacing: ${cardSpacing})`);
-      } else {
-        console.log(`[DEBUG] 카드 ${card.id} 이동 없음`);
+        const offset = (targetIndex - currentIndex) * cardSpacing + 6;
+        offsets[currentIndex] = offset; // 현재 위치를 키로 사용
       }
     });
+    
+    console.log('[DEBUG] 최종 offsets 객체:', offsets);
     
     console.log('[DEBUG] 색상 정렬 - 최종 offsets:', offsets);
     setCardOffsets(offsets);
@@ -1711,11 +1835,20 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     // 애니메이션 완료 후 배열 업데이트
     setTimeout(() => {
       console.log('[DEBUG] 색상 정렬 - 애니메이션 완료, sortedHand 업데이트');
-      setSortedHand(sorted);
+      
+      // id 값을 유지하면서 정렬된 순서로 업데이트
+      const updatedSorted = sorted.map((card, newIndex) => ({
+        ...card,
+        id: newIndex // 새로운 인덱스로 id 업데이트
+      }));
+      
+      setSortedHand(updatedSorted);
+      // myHand도 sortedHand와 동기화
+      setMyHand(updatedSorted);
       setCardOffsets({});
       setIsSorting(false);
-      hasBeenSortedRef.current = true; // 정렬 완료 표시
-      console.log('[DEBUG] 색상 정렬 - hasBeenSortedRef를 true로 설정');
+      console.log('[DEBUG] 색상 정렬 - 애니메이션 완료 후 hasBeenSortedRef 상태:', hasBeenSortedRef.current);
+      console.log('[DEBUG] 색상 정렬 - myHand도 sortedHand와 동기화됨');
     }, 800); // CSS 애니메이션 시간과 맞춤
   };
 
@@ -2090,8 +2223,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
                 <div 
                   key={tile.id} 
                   className={`hand-tile ${getDisplayColor(tile.color, gameMode)} ${selectedCards.includes(tile.id) ? 'selected' : ''} ${draggedCard === tile.id ? 'dragging' : ''} ${isSorting ? 'sorting' : ''} ${showCardDealAnimation ? 'dealing' : ''} ${dealtCards.has(index) ? 'dealt' : ''}`}
-                  style={isSorting && cardOffsets[tile.id] !== undefined ? {
-                    transform: `translateX(${cardOffsets[tile.id]}px)`
+                  style={isSorting && cardOffsets[index] !== undefined ? {
+                    transform: `translateX(${cardOffsets[index]}px)`
                   } : showCardDealAnimation ? {
                     animationDelay: `${index * 0.12}s`
                   } : {}}
