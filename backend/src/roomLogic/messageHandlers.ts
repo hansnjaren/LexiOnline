@@ -269,19 +269,14 @@ export function handleEasyMode(room: IMyRoom, client: Client, data: any) {
   if (typeof data.easyMode === "boolean") {
     player.easyMode = data.easyMode;
 
-    // 토글로 바꾸고 싶을 때 (필요시 주석 해제)
-    // player.easyMode = !player.easyMode;
-  } else {
-    // player.easyMode = !player.easyMode;
+    // 다른 클라이언트에게 이 플레이어의 이지모드 상태 변경을 알림
+    room.broadcast("playerEasyModeChanged", {
+      playerId: client.sessionId,
+      easyMode: player.easyMode,
+    }, { except: client }); // 변경을 보낸 클라이언트는 제외
+
+    console.log(`[DEBUG] Player ${client.sessionId} set easyMode to ${player.easyMode}`);
   }
-
-  room.state.easyMode = [...room.state.players.values()].some(p => p.easyMode);
-
-  // room.broadcast("easyModeUpdated", {
-  //   playerId: client.sessionId,
-  //   easyMode: player.easyMode,
-  //   roomEasyMode: room.state.easyMode,
-  // });
 }
 
 // parseCard 임포트용 타입 선언 (실제 import는 MyRoom.ts에서 진행)

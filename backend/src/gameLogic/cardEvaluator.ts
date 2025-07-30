@@ -32,28 +32,35 @@ export function getValue(number: number, type: number, maxNumber: number): numbe
 }
 
 export function isStraightWithException(numbers: number[], maxNumber: number): boolean {
-  console.log(`[DEBUG] 스트레이트 검사: numbers=${numbers.join(', ')}, maxNumber=${maxNumber}`);
-  
-  for (let i = 1; i < 5; ++i) {
-    const diff = (numbers[i] + maxNumber - numbers[i - 1]) % maxNumber;
-    console.log(`[DEBUG] 연속성 검사: ${numbers[i-1]} -> ${numbers[i]}, diff=${diff}`);
-    if (diff !== 1) return false;
+  console.log(`[DEBUG] 스트레이트 검사 시작: numbers=[${numbers.join(', ')}], maxNumber=${maxNumber}`);
+
+  const remappedNumbers = numbers.map(n => (n + 2) % maxNumber).sort((a, b) => a - b);
+  console.log(`[DEBUG] 재매핑된 숫자: [${remappedNumbers.join(', ')}]`);
+
+  // Check for normal consecutive straight
+  let isConsecutive = true;
+  for (let i = 0; i < remappedNumbers.length - 1; i++) {
+    if (remappedNumbers[i+1] - remappedNumbers[i] !== 1) {
+      isConsecutive = false;
+      break;
+    }
   }
-  
-  // 특별한 경우: A-2-3-4-5 스트레이트는 제외
-  if (
-    numbers[0] === maxNumber - 3 &&
-    numbers[1] === maxNumber - 2 &&
-    numbers[2] === maxNumber - 1 &&
-    numbers[3] === 0 &&
-    numbers[4] === 1
-  ) {
-    console.log(`[DEBUG] A-2-3-4-5 스트레이트 제외`);
-    return false;
+  if (isConsecutive) {
+    console.log(`[DEBUG] 일반 연속 스트레이트 확인됨.`);
+    return true;
   }
-  
-  console.log(`[DEBUG] 스트레이트 확인됨`);
-  return true;
+
+  // Check for mountain straight (10-J-Q-K-A)
+  // Remapped numbers are [9, 10, 11, 12, 0], sorted to [0, 9, 10, 11, 12]
+  const mountainStraight = [0, maxNumber - 4, maxNumber - 3, maxNumber - 2, maxNumber - 1];
+  const isMountain = remappedNumbers.length === mountainStraight.length && remappedNumbers.every((val, index) => val === mountainStraight[index]);
+  if (isMountain) {
+    console.log(`[DEBUG] 마운틴 스트레이트 (10-J-Q-K-A) 확인됨.`);
+    return true;
+  }
+
+  console.log(`[DEBUG] 스트레이트 아님.`);
+  return false;
 }
 
 // 1~3장 simple combo

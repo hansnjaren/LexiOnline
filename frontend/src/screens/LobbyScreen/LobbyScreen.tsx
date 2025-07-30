@@ -86,7 +86,8 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
 
     setIsConnecting(true);
     try {
-      const room = await ColyseusService.createRoom();
+      const authToken = sessionStorage.getItem('access_token');
+      const room = await ColyseusService.createRoom({ authToken });
       console.log('방 생성 성공:', room.sessionId);
       
       // 닉네임 설정 및 중복 체크
@@ -118,7 +119,8 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
 
     setIsConnecting(true);
     try {
-      const room = await ColyseusService.joinRoom(roomCode);
+      const authToken = sessionStorage.getItem('access_token');
+      const room = await ColyseusService.joinRoom(roomCode, { authToken });
       console.log('방 참가 성공:', room.sessionId);
       
       // 닉네임 설정 및 중복 체크
@@ -199,7 +201,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
                 )}
                 <div className={`user-info compact`}>
                   <h3>{user.nickname || '익명'}</h3>
-                  <p>rating: {user.rating_mu || '0'}</p>
+                  <p>rating: {user.rating_mu ? user.rating_mu.toFixed(2) : '0'}</p>
                 </div>
               </div>
               <button className={`btn btn-logout compact`} onClick={handleLogout}>

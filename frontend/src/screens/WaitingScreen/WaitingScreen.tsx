@@ -8,6 +8,7 @@ interface Player {
   id: string;
   nickname: string;
   isReady: boolean;
+  easyMode: boolean;
 }
 
 interface WaitingScreenProps {
@@ -84,6 +85,7 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
   const [players, setPlayers] = useState<Player[]>([]);
   const [roomCode, setRoomCode] = useState('');
   const [rounds, setRounds] = useState(3);
+  const [easyMode, setEasyMode] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
@@ -144,7 +146,8 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
           playerList.push({
             id: sessionId,
             nickname: player.nickname || '익명',
-            isReady: player.ready || false
+            isReady: player.ready || false,
+            easyMode: player.easyMode || false,
           });
         });
         setPlayers(playerList);
@@ -177,7 +180,8 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
           playerList.push({
             id: sessionId,
             nickname: player.nickname || '익명',
-            isReady: player.ready || false
+            isReady: player.ready || false,
+            easyMode: player.easyMode || false,
           });
         });
         setPlayers(playerList);
@@ -246,6 +250,15 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
       setRounds(message.totalRounds);
     });
 
+    room.onMessage('playerEasyModeChanged', (message: any) => {
+      console.log('플레이어 이지 모드 변경:', message);
+      setPlayers(prevPlayers =>
+        prevPlayers.map(p =>
+          p.id === message.playerId ? { ...p, easyMode: message.easyMode } : p
+        )
+      );
+    });
+
     room.onMessage('changeRejected', (message: any) => {
       console.error('라운드 수 변경 거부:', message.reason);
       alert('라운드 수 변경이 거부되었습니다: ' + message.reason);
@@ -265,7 +278,8 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
           {
             id: message.playerId,
             nickname: message.nickname,
-            isReady: false
+            isReady: false,
+            easyMode: false, // 기본값
           }
         ];
       });
@@ -316,7 +330,8 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
       const updatedPlayers: Player[] = message.players.map((p: any) => ({
         id: p.playerId,
         nickname: p.nickname,
-        isReady: p.isReady
+        isReady: p.isReady,
+        easyMode: p.easyMode || false,
       }));
       setPlayers(updatedPlayers);
       
@@ -406,6 +421,9 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
             {players.length > 0 ? (
               players.map((player) => (
                 <div key={player.id} className="player-item">
+                  <span className={`status ${player.easyMode ? 'ready' : 'waiting'}`}>
+                    {player.easyMode ? '초보 모드' : '일반 모드'}
+                  </span>
                   <span className="nickname">{player.nickname}</span>
                   <span className={`status ${player.isReady ? 'ready' : 'waiting'}`}>
                     {player.isReady ? '준비완료' : '대기중'}
@@ -420,17 +438,15 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
           </div>
         </div>
 
-        {/* 게임 설정 - 호스트에게만 표시 */}
-        {isHost && (
-          <div className="game-settings">
-            <h2>게임 설정</h2>
+        <div className="game-settings">
+          <h2>게임 설정</h2>
+          <div className="settings-row">
             <div className="rounds-setting">
               <label htmlFor="rounds">라운드 수:</label>
               <CustomDropdown
                 value={rounds}
                 onChange={(value) => {
                   setRounds(value);
-                  // 서버에 라운드 수 변경 요청
                   const room = ColyseusService.getRoom();
                   if (room) {
                     room.send('changeRounds', { rounds: value });
@@ -443,10 +459,29 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
                   { value: 4, label: '4라운드' },
                   { value: 5, label: '5라운드' },
                 ]}
+                disabled={!isHost}
               />
             </div>
+              <div className="easymode-setting">
+                <label>초보 모드:</label>
+                <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={easyMode}
+                  onChange={() => {
+                    const room = ColyseusService.getRoom();
+                    if (room) {
+                      const newEasyMode = !easyMode;
+                      setEasyMode(newEasyMode);
+                      room.send('easyMode', { easyMode: newEasyMode });
+                    }
+                  }}
+                />
+                <span className="slider round"></span>
+              </label>
+            </div>
           </div>
-        )}
+        </div>
 
         <div className="controls">
           <button 
@@ -469,4 +504,4 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
   );
 };
 
-export default WaitingScreen; 
+export default WaitingScreen;

@@ -1,42 +1,61 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './ResultScreen.css';
 import ColyseusService from '../../services/ColyseusService';
 
-
-
-interface ResultScreenProps {
-  onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result') => void;
-  playerCount: number;
-  roundResult?: any;
+// #region Interfaces
+interface PlayerScore {
+  playerId: string;
+  score: number;
+  nickname: string;
+  scoreDiff: number;
+  remainingTiles: number;
 }
 
-interface RoundResult {
-  scores: Array<{
-    playerId: string;
-    score: number;
-    nickname: string;
-    scoreDiff: number;
-  }>;
+interface ComprehensiveResult {
+  scores: PlayerScore[];
   round: number;
   isGameEnd: boolean;
+  scoreBeforeCalculation: Array<{ playerId: string; score: number }>;
+  scoreMatrix: { [key: string]: { [key: string]: number } };
+  finalHands: { [key: string]: number[] };
+  maxNumber: number;
 }
 
-// AnimatedArrow 컴포넌트: SVG 화살표 + 애니메이션
+interface ResultScreenProps {
+  onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result' | 'finalResult') => void;
+  playerCount: number;
+  roundResult: ComprehensiveResult | null;
+}
+// #endregion
+
+// #region Helper Functions for Verification
+const getTwosCount = (hand: number[], maxNumber: number): number => {
+  let count = 0;
+  hand.forEach(card => {
+    // 카드 값이 2인 경우: card % maxNumber === 1
+    if (card % maxNumber === 1) {
+      count++;
+    }
+  });
+  return count;
+};
+// #endregion
+
+// #region AnimatedArrow Component
 const AnimatedArrow: React.FC<{
   from: { x: number; y: number } | null;
   to: { x: number; y: number } | null;
   visible: boolean;
 }> = ({ from, to, visible }) => {
-  const ARROW_RADIUS = 35; // 원의 반지름(px)
-  const ARROW_HEAD_SIZE = 25; // 화살촉 크기를 18에서 25로 증가
+  const ARROW_RADIUS = 35;
+  const ARROW_HEAD_SIZE = 25;
   const [progress, setProgress] = React.useState(0);
 
   React.useEffect(() => {
     if (visible) {
       setProgress(0);
-      // 애니메이션 시작
       const startTime = Date.now();
-      const duration = 1500; // 1.5초로 단축
+      const duration = 1500;
       
       const animate = () => {
         const elapsed = Date.now() - startTime;
@@ -47,7 +66,6 @@ const AnimatedArrow: React.FC<{
           requestAnimationFrame(animate);
         }
       };
-      
       requestAnimationFrame(animate);
     } else {
       setProgress(0);
@@ -55,326 +73,326 @@ const AnimatedArrow: React.FC<{
   }, [from, to, visible]);
 
   if (!from || !to || !visible) return null;
+
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const angle = Math.atan2(dy, dx);
-  // 시작점: from 중심에서 to 방향으로 ARROW_RADIUS만큼 이동
   const startX = from.x + Math.cos(angle) * ARROW_RADIUS;
   const startY = from.y + Math.sin(angle) * ARROW_RADIUS;
-  // 끝점: to 중심에서 from 방향으로 ARROW_RADIUS만큼 이동
   const endX = to.x - Math.cos(angle) * ARROW_RADIUS;
   const endY = to.y - Math.sin(angle) * ARROW_RADIUS;
-  const totalLength = Math.sqrt((endX - startX) ** 2 + (endY - startY) ** 2);
-  const currentLength = progress * totalLength;
-  // 현재 길이에 따른 끝점 계산
+  
   const currentEndX = startX + (endX - startX) * progress;
   const currentEndY = startY + (endY - startY) * progress;
-  // 화살촉 좌표 (현재 끝점에서 더 나아간 위치)
   const arrowHeadX = currentEndX + (ARROW_HEAD_SIZE * 0.4) * Math.cos(angle);
   const arrowHeadY = currentEndY + (ARROW_HEAD_SIZE * 0.4) * Math.sin(angle);
 
   return (
     <svg className="arrow-svg" width="600" height="600" style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 20 }}>
-      <line
-        x1={startX}
-        y1={startY}
-        x2={currentEndX}
-        y2={currentEndY}
-        stroke="#ffd700"
-        strokeWidth={7}
-        strokeLinecap="round"
-        style={{}}
-      />
-      {/* 화살촉 - 선과 함께 움직임 */}
+      <line x1={startX} y1={startY} x2={currentEndX} y2={currentEndY} stroke="#ffd700" strokeWidth={7} strokeLinecap="round" />
       <polygon
-        points={`
-          ${arrowHeadX},${arrowHeadY}
-          ${arrowHeadX - ARROW_HEAD_SIZE * Math.cos(angle - 0.35)},${arrowHeadY - ARROW_HEAD_SIZE * Math.sin(angle - 0.35)}
-          ${arrowHeadX - ARROW_HEAD_SIZE * Math.cos(angle + 0.35)},${arrowHeadY - ARROW_HEAD_SIZE * Math.sin(angle + 0.35)}
-        `}
+        points={`${arrowHeadX},${arrowHeadY} ${arrowHeadX - ARROW_HEAD_SIZE * Math.cos(angle - 0.35)},${arrowHeadY - ARROW_HEAD_SIZE * Math.sin(angle - 0.35)} ${arrowHeadX - ARROW_HEAD_SIZE * Math.cos(angle + 0.35)},${arrowHeadY - ARROW_HEAD_SIZE * Math.sin(angle + 0.35)}`}
         fill="#ffd700"
-        style={{}}
       />
     </svg>
   );
 };
+// #endregion
 
-const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount, roundResult: initialRoundResult }) => {
-  const [transferMessage, setTransferMessage] = useState('');
-  const [currentTransferStep, setCurrentTransferStep] = useState(0);
+const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount, roundResult: comprehensiveResult }) => {
+  // #region State & Derived Values
+  const [transferMessage, setTransferMessage] = useState('결과 집계 중...');
+  const [currentTransferStep, setCurrentTransferStep] = useState(-1);
   const [showArrow, setShowArrow] = useState(false);
-  const [showButtons, setShowButtons] = useState(true);
-  const [roundResult, setRoundResult] = useState<RoundResult | null>(initialRoundResult || null);
-  const [actualPlayerCount, setActualPlayerCount] = useState(playerCount);
+  const [showButtons, setShowButtons] = useState(false);
+  
+  const initialScores = comprehensiveResult?.scoreBeforeCalculation;
+  const scoreMatrix = comprehensiveResult?.scoreMatrix;
+  const rankedPlayers = comprehensiveResult?.scores || [];
+  const finalHands = comprehensiveResult?.finalHands;
+  const maxNumber = comprehensiveResult?.maxNumber;
+  
+  const [displayScores, setDisplayScores] = useState<{ [playerId: string]: number }>({});
+  const [playerComponents, setPlayerComponents] = useState<{ [playerId: string]: number }>({});
+  const [transfers, setTransfers] = useState<Array<{ giverId: string; receiverId: string; amount: number }>>([]);
   const [isReadyForAnimation, setIsReadyForAnimation] = useState(false);
+  const [actualPlayerCount] = useState(() => (comprehensiveResult?.scores || []).length || playerCount);
 
-  // 각 타일카운트 원의 ref를 개별적으로 생성
-  const player0Ref = useRef<HTMLDivElement>(null);
-  const player1Ref = useRef<HTMLDivElement>(null);
-  const player2Ref = useRef<HTMLDivElement>(null);
-  const player3Ref = useRef<HTMLDivElement>(null);
-  const player4Ref = useRef<HTMLDivElement>(null);
-  
-  const tileRefs: { [key: string]: React.RefObject<HTMLDivElement | null> } = {
-    player0: player0Ref,
-    player1: player1Ref,
-    player2: player2Ref,
-    player3: player3Ref,
-    player4: player4Ref,
-  };
-  
-  const layoutRef = useRef<HTMLDivElement>(null);
+  const playerRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
+  const layoutRef = useRef<HTMLDivElement | null>(null);
   const [centers, setCenters] = useState<{ [key: string]: { x: number; y: number } | null }>({});
+  // #endregion
 
-  // 위치 계산
+  // #region useEffects
   useEffect(() => {
+    const scores: { [playerId: string]: number } = {};
+    if (initialScores) {
+      initialScores.forEach(p => {
+        scores[p.playerId] = p.score;
+      });
+      setDisplayScores(scores);
+      setIsReadyForAnimation(false);
+      setCurrentTransferStep(-1);
+      setShowButtons(false);
+      setTransferMessage('결과 집계 중...');
+    }
+
+    if (comprehensiveResult && finalHands && maxNumber && rankedPlayers) {
+      const components: { [key: string]: number } = {};
+      rankedPlayers.forEach(p => {
+        const hand = finalHands[p.playerId];
+        if (hand) {
+          const twosCount = getTwosCount(hand, maxNumber);
+          components[p.playerId] = p.remainingTiles * (2 ** twosCount);
+        } else {
+          components[p.playerId] = 0;
+        }
+      });
+      setPlayerComponents(components);
+    }
+  }, [comprehensiveResult]);
+
+  useEffect(() => {
+    if (!rankedPlayers.length) return;
     const newCenters: { [key: string]: { x: number; y: number } | null } = {};
-    
-    for (let i = 0; i < actualPlayerCount; i++) {
+    for (let i = 0; i < rankedPlayers.length; i++) {
+      const player = rankedPlayers[i];
       const key = `player${i}`;
-      const tile = tileRefs[key]?.current;
+      const tile = playerRefs.current[key];
       const layout = layoutRef.current;
       if (tile && layout) {
         const tileRect = tile.getBoundingClientRect();
         const layoutRect = layout.getBoundingClientRect();
-        newCenters[key] = {
+        newCenters[player.playerId] = {
           x: tileRect.left + tileRect.width / 2 - layoutRect.left,
           y: tileRect.top + tileRect.height / 2 - layoutRect.top,
         };
-      } else {
-        newCenters[key] = null;
       }
     }
-    
     setCenters(newCenters);
-    
-    // 모든 위치가 계산되면 애니메이션 준비 완료
-    const allPositionsCalculated = Object.values(newCenters).every(pos => pos !== null);
-    if (allPositionsCalculated && !isReadyForAnimation) {
-      setIsReadyForAnimation(true);
-    }
-  }, [showArrow, currentTransferStep, actualPlayerCount, isReadyForAnimation]);
+    const timer = setTimeout(() => {
+        if (Object.keys(newCenters).length === rankedPlayers.length) {
+            setIsReadyForAnimation(true);
+        }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [rankedPlayers]);
 
   useEffect(() => {
-    // Colyseus 서비스에서 라운드 결과 정보 가져오기
-    const room = ColyseusService.getRoom();
-    if (room) {
-      // 실제 플레이어 수 가져오기
-      const playerCount = room.state.players.size;
-      setActualPlayerCount(playerCount);
-      console.log('실제 플레이어 수:', playerCount);
+    if (scoreMatrix) {
+      const newTransfers: Array<{ giverId: string; receiverId: string; amount: number }> = [];
+      for (const giverId in scoreMatrix) {
+        for (const receiverId in scoreMatrix[giverId]) {
+          const amount = scoreMatrix[giverId][receiverId];
+          if (amount > 0) {
+            newTransfers.push({ giverId, receiverId, amount });
+          }
+        }
+      }
+      setTransfers(newTransfers);
+    }
+  }, [scoreMatrix]);
 
-      // 라운드 결과 메시지 수신
-      const handleRoundEnded = (message: RoundResult) => {
-        console.log('라운드 결과 수신:', message);
-        console.log('scores 배열:', message.scores);
-        console.log('scores 길이:', message.scores?.length);
-        setRoundResult(message);
-      };
+  useEffect(() => {
+    if (!isReadyForAnimation || !initialScores || !comprehensiveResult || !finalHands || !maxNumber) {
+      return;
+    }
 
-      room.onMessage('roundEnded', handleRoundEnded);
-      room.onMessage('gameEnded', handleRoundEnded);
+    // If animation is ready but there are no transfers, end immediately.
+    if (transfers.length === 0) {
+      setTransferMessage('결과 집계 완료!');
+      setShowArrow(false);
+      // Run verification even if there are no transfers
+      console.log("--- VERIFICATION ---");
+      const beScoreDiffs: {[key: string]: number} = {};
+      comprehensiveResult.scores.forEach(p => beScoreDiffs[p.playerId] = p.scoreDiff);
+      let allMatch = true;
+      for(const p of rankedPlayers) {
+        if (beScoreDiffs[p.playerId] !== 0) {
+          allMatch = false;
+        }
+      }
+      console.log("Verification successful (no transfers):", allMatch);
+      // --- END VERIFICATION ---
+      setTimeout(() => setShowButtons(true), 2000);
+      return;
+    }
+    
+    const totalSteps = transfers.length;
+    const playerMap = new Map(rankedPlayers.map(p => [p.playerId, p]));
+    let animationTimeout: NodeJS.Timeout;
 
-      // 기존에 이미 결과가 있는지 확인
-      console.log('현재 room.state:', room.state);
-      console.log('현재 플레이어들:', Array.from(room.state.players.entries()));
-      
-      // 이미 게임이 끝난 상태라면 현재 플레이어 정보로 결과 구성
-      const currentPlayers = Array.from(room.state.players.entries()) as [string, any][];
-      if (currentPlayers.length > 0) {
-        const scores = currentPlayers.map(([id, p]) => ({
-          playerId: id,
-          score: p.hand ? p.hand.length : 0, // 남은 카드 수
-          nickname: p.nickname || '익명',
-          scoreDiff: 0
-        }));
+    const runAnimationStep = (step: number) => {
+      if (step >= totalSteps) {
+        // Animation finished
+        setTransferMessage('결과 집계 완료!');
+        setShowArrow(false);
+
+        // --- VERIFICATION LOGIC ---
+        console.log("--- VERIFICATION ---");
+        const feScoreDiffs: {[key: string]: number} = {};
+        rankedPlayers.forEach(p => feScoreDiffs[p.playerId] = 0);
+
+        const playerComponents: {[key: string]: number} = {};
+        rankedPlayers.forEach(p => {
+          const hand = finalHands[p.playerId];
+          if (hand) {
+            const twosCount = getTwosCount(hand, maxNumber);
+            playerComponents[p.playerId] = p.remainingTiles * (2 ** twosCount);
+          } else {
+            playerComponents[p.playerId] = 0;
+          }
+        });
+
+        for (let i = 0; i < rankedPlayers.length; i++) {
+          for (let j = i + 1; j < rankedPlayers.length; j++) {
+            const playerA = rankedPlayers[i];
+            const playerB = rankedPlayers[j];
+            
+            const scoreA = playerComponents[playerA.playerId];
+            const scoreB = playerComponents[playerB.playerId];
+            const diff = scoreA - scoreB;
+
+            // The player with the higher component pays the one with the lower component.
+            // So, the one with the higher component loses points, and the one with the lower component gains points.
+            feScoreDiffs[playerA.playerId] -= diff;
+            feScoreDiffs[playerB.playerId] += diff;
+          }
+        }
         
-        // 점수 순으로 정렬 (낮은 점수가 높은 순위)
-        scores.sort((a, b) => a.score - b.score);
-        
-        const currentResult: RoundResult = {
-          scores,
-          round: room.state.round || 1,
-          isGameEnd: true
-        };
-        
-        console.log('현재 상태로 결과 구성:', currentResult);
-        setRoundResult(currentResult);
+        const beScoreDiffs: {[key: string]: number} = {};
+        comprehensiveResult.scores.forEach(p => beScoreDiffs[p.playerId] = p.scoreDiff);
+
+        let allMatch = true;
+        for(const playerId in feScoreDiffs) {
+          if(Math.round(feScoreDiffs[playerId]) !== Math.round(beScoreDiffs[playerId])) {
+            console.log(`Mismatch for ${playerId}: FE: ${feScoreDiffs[playerId]}, BE: ${beScoreDiffs[playerId]}`);
+            allMatch = false;
+          }
+        }
+        console.log("Verification successful:", allMatch);
+        // --- END VERIFICATION ---
+
+        setTimeout(() => setShowButtons(true), 2000);
+        return;
       }
 
-      return () => {
-        // cleanup 함수는 비워둠 (리스너가 자동으로 정리됨)
-      };
-    }
-  }, []);
+      // Run current step logic
+      setCurrentTransferStep(step);
+      const transfer = transfers[step];
+      const giver = playerMap.get(transfer.giverId);
+      const receiver = playerMap.get(transfer.receiverId);
 
-  useEffect(() => {
-    // 애니메이션 준비가 완료된 후에만 애니메이션 시작
-    if (!isReadyForAnimation) return;
-    
-    // 참가자 인원수에 따라 메시지 배열 동적 생성
-    const generateSteps = (count: number) => {
-      const steps = [];
-      
-              // 1등부터 (count-1)등까지의 메시지 추가
-        for (let i = 1; i < count; i++) {
-          steps.push(`<span class="guide-tag">🔎 GUIDE</span> ${i}등과의 남은 타일 개수 차이만큼 코인을 전달`);
-        }
-      
-      // 마지막에 결과 집계 완료 메시지 추가
-      steps.push('결과 집계 완료!');
-      
-      return steps;
-    };
-    
-    const steps = generateSteps(actualPlayerCount);
-    let currentStep = 0;
-    setTransferMessage(steps[0]);
-    setCurrentTransferStep(0);
-    setShowArrow(true);
-    setShowButtons(false); // 애니메이션 시작 시 버튼 숨김
-    const timer = setInterval(() => {
-      if (currentStep < steps.length - 1) {
-        currentStep++;
-        setTransferMessage(steps[currentStep]);
-        setCurrentTransferStep(currentStep);
+      if (giver && receiver) {
+        setTransferMessage(`<span class="guide-tag">${giver.nickname}</span> 님이 <span class="guide-tag">${receiver.nickname}</span> 님에게 <span class="guide-tag">${transfer.amount}</span> 코인 전달`);
+        
+        setDisplayScores(currentScores => {
+          const newScores = { ...currentScores };
+          newScores[giver.playerId] -= transfer.amount;
+          newScores[receiver.playerId] += transfer.amount;
+          return newScores;
+        });
         setShowArrow(true);
       } else {
         setShowArrow(false);
-        clearInterval(timer);
-        
-        // "결과 집계 완료!" 메시지가 표시된 후 2초 뒤에 버튼 표시
-        setTimeout(() => {
-          setTransferMessage('');
-          setShowButtons(true);
-        }, 2000);
       }
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [actualPlayerCount, isReadyForAnimation]);
 
-  // roundResult 변경 감지
-  useEffect(() => {
-    console.log('roundResult 변경됨:', roundResult);
-    if (roundResult?.scores) {
-      console.log('scores 상세:', roundResult.scores);
-    }
-  }, [roundResult]);
+      // Schedule next step
+      animationTimeout = setTimeout(() => runAnimationStep(step + 1), 2500);
+    };
 
+    // Start the animation
+    runAnimationStep(0);
+
+    return () => {
+      clearTimeout(animationTimeout);
+    };
+  }, [isReadyForAnimation, comprehensiveResult, transfers]);
+  // #endregion
+
+  // #region Handlers
   const handlePlayAgain = () => {
-    console.log('다시하기');
     const room = ColyseusService.getRoom();
     if (room) {
-      // 다음 라운드 준비 완료 신호 전송
       room.send('readyForNextRound', {});
-      // 게임 화면으로 이동
       onScreenChange('game');
     }
   };
 
+  const handleShowFinalResult = () => {
+    const room = ColyseusService.getRoom();
+    if (room) {
+      room.send('requestFinalResult', {});
+    }
+  };
+
   const handleBackToLobby = () => {
-    console.log('로비로 돌아가기');
     ColyseusService.disconnect();
     onScreenChange('lobby');
+  };
+  // #endregion
+
+  // #region Render
+  const getArrowProps = () => {
+    if (!showArrow || currentTransferStep < 0 || transfers.length <= currentTransferStep) {
+      return { from: null, to: null, visible: false };
+    }
+  
+    const transfer = transfers[currentTransferStep];
+    if (transfer) {
+      return {
+        from: centers[transfer.giverId] || null,
+        to: centers[transfer.receiverId] || null,
+        visible: true,
+      };
+    }
+    
+    return { from: null, to: null, visible: false };
   };
 
   return (
     <div className="result-screen">
       <div className="result-container">
-        {/* 상단 섹션 - 상대방 정보 */}
         <div className="opponent-section">
           <div className={`circular-layout players-${actualPlayerCount}`} ref={layoutRef}>
-            {/* 플레이어 박스들을 동적으로 생성 */}
-            {roundResult?.scores.map((player, index) => {
+            {rankedPlayers.map((player, index) => {
               const rank = index + 1;
-              const tileCount = player.score; // score가 남은 카드 수
               const rankColors = ['gold', 'silver', 'bronze', 'black', 'gray'];
               const rankColor = rankColors[index] || 'gray';
               
               return (
-                <div key={index} className="player-box">
+                <div key={player.playerId} className="player-box" ref={el => { playerRefs.current[`player${index}`] = el; }}>
                   <div className="player-placeholder">{player.nickname}</div>
                   <div className="tiles-info">
-                    <span className="remaining-count">{tileCount}장</span>
-                    <div className={`tile-count ${rankColor}`} ref={tileRefs[`player${index}` as keyof typeof tileRefs]}>
-                      {tileCount}
-                    </div>
-                  </div>
-                </div>
-              );
-            }) || Array.from({ length: actualPlayerCount }, (_, index) => {
-              // roundResult가 없을 때는 기본 플레이어 박스 표시
-              const rank = index + 1;
-              const rankColors = ['gold', 'silver', 'bronze', 'black', 'gray'];
-              const rankColor = rankColors[index] || 'gray';
-              
-              return (
-                <div key={index} className="player-box">
-                  <div className="player-placeholder">닉네임</div>
-                  <div className="tiles-info">
-                    <span className="remaining-count">0장</span>
-                    <div className={`tile-count ${rankColor}`} ref={tileRefs[`player${index}` as keyof typeof tileRefs]}>
-                      0
+                    <span className="remaining-count">{playerComponents[player.playerId] ?? 0}개</span>
+                    <div className={`tile-count ${rankColor}`}>
+                      {displayScores[player.playerId] ?? 0}
                     </div>
                   </div>
                 </div>
               );
             })}
-            {/* SVG 화살표 */}
-            {showArrow && (
-              <>
-                {/* 플레이어 수에 따른 화살표 애니메이션 */}
-                {currentTransferStep === 0 && actualPlayerCount >= 2 && (
-                  <AnimatedArrow from={centers.player1} to={centers.player0} visible={true} />
-                )}
-                {currentTransferStep === 0 && actualPlayerCount >= 3 && (
-                  <AnimatedArrow from={centers.player2} to={centers.player0} visible={true} />
-                )}
-                {currentTransferStep === 0 && actualPlayerCount >= 4 && (
-                  <AnimatedArrow from={centers.player3} to={centers.player0} visible={true} />
-                )}
-                {currentTransferStep === 0 && actualPlayerCount >= 5 && (
-                  <AnimatedArrow from={centers.player4} to={centers.player0} visible={true} />
-                )}
-                
-                {currentTransferStep === 1 && actualPlayerCount >= 3 && (
-                  <AnimatedArrow from={centers.player2} to={centers.player1} visible={true} />
-                )}
-                {currentTransferStep === 1 && actualPlayerCount >= 4 && (
-                  <AnimatedArrow from={centers.player3} to={centers.player1} visible={true} />
-                )}
-                {currentTransferStep === 1 && actualPlayerCount >= 5 && (
-                  <AnimatedArrow from={centers.player4} to={centers.player1} visible={true} />
-                )}
-                
-                {currentTransferStep === 2 && actualPlayerCount >= 4 && (
-                  <AnimatedArrow from={centers.player3} to={centers.player2} visible={true} />
-                )}
-                {currentTransferStep === 2 && actualPlayerCount >= 5 && (
-                  <AnimatedArrow from={centers.player4} to={centers.player2} visible={true} />
-                )}
-                
-                {currentTransferStep === 3 && actualPlayerCount >= 5 && (
-                  <AnimatedArrow from={centers.player4} to={centers.player3} visible={true} />
-                )}
-              </>
-            )}
+            <AnimatedArrow {...getArrowProps()} />
           </div>
         </div>
 
-        {/* 하단 정보 바 */}
         {!showButtons && (
           <div className={`transfer-info ${transferMessage === '결과 집계 완료!' ? 'complete-message' : ''}`}>
             <span dangerouslySetInnerHTML={{ __html: transferMessage }}></span>
           </div>
         )}
 
-        {/* 컨트롤 버튼들 */}
         {showButtons && (
           <div className="controls">
-            <button className="btn btn-primary" onClick={handlePlayAgain}>
-              다시하기
-            </button>
+            {comprehensiveResult?.isGameEnd ? (
+              <button className="btn btn-primary" onClick={handleShowFinalResult}>
+                최종 결과 보기
+              </button>
+            ) : (
+              <button className="btn btn-primary" onClick={handlePlayAgain}>
+                다음 라운드
+              </button>
+            )}
             <button className="btn btn-secondary" onClick={handleBackToLobby}>
               로비로 돌아가기
             </button>
@@ -383,6 +401,7 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
       </div>
     </div>
   );
+  // #endregion
 };
 
 export default ResultScreen;

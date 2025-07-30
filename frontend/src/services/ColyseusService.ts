@@ -46,9 +46,9 @@ class ColyseusService {
     }
   }
 
-  async createRoom(): Promise<Room> {
+  async createRoom(options: any = {}): Promise<Room> {
     try {
-      this.room = await this.client.create("my_room");
+      this.room = await this.client.create("my_room", options);
       this.isConnected = true;
       
       // 방 정보 저장
@@ -75,10 +75,10 @@ class ColyseusService {
     }
   }
 
-  async joinRoom(roomId: string): Promise<Room> {
+  async joinRoom(roomId: string, options: any = {}): Promise<Room> {
     try {
       // roomId가 실제 방 ID인지 확인하고 참가
-      this.room = await this.client.joinById(roomId);
+      this.room = await this.client.joinById(roomId, options);
       this.isConnected = true;
       
       // 방 정보 저장
@@ -219,4 +219,4 @@ class ColyseusService {
   }
 }
 
-export default new ColyseusService(); 
+export default new ColyseusService();

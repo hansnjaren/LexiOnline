@@ -8,6 +8,8 @@ import { dealCards } from "../gameLogic/dealCards";
 import { findPlayerWithCloud3 } from "../gameLogic/findPlayerWithCloud3";
 import { calculateRoundScores, calculateRoundScoreMatrix } from "../gameLogic/scoreCalculator";
 import { MADE_NONE } from "../gameLogic/cardEvaluator";
+import prisma from "../../prisma/client";
+import jwt, { JwtPayload } from "jsonwebtoken"
 import {
   handleSubmit,
   handlePass,
@@ -15,10 +17,14 @@ import {
   handleEasyMode,
   IMyRoom,
 } from "../roomLogic/messageHandlers";
+import { calculateRanks } from "../gameLogic/calculateRanks";
+import { calculateRatings } from "../gameLogic/calculateRatings";
+import { DEFAULT_RATING_MU, DEFAULT_RATING_SIGMA } from "../constants/rating";
 
 export class MyRoom extends Room<MyRoomState> implements IMyRoom {
   maxClients = 5;
   state = new MyRoomState();
+  private finalGameResult: any = null;
   
   // 방이 비어있을 때 자동 삭제 시간 (30분)
   autoDispose = false;
@@ -141,7 +147,6 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       }
       
       // 다음 라운드로 진행
-      this.state.round++;
       this.startRound();
     });
 
@@ -191,7 +196,15 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       });
     });
 
-
+    this.onMessage("requestFinalResult", (client) => {
+      if (this.finalGameResult) {
+        console.log(`[DEBUG] 플레이어 ${client.sessionId}에게 최종 결과를 전송합니다.`);
+        client.send("finalResult", this.finalGameResult);
+      } else {
+        console.log(`[WARN] 플레이어 ${client.sessionId}가 최종 결과를 요청했지만, 아직 준비되지 않았습니다.`);
+        client.send("finalResultNotReady");
+      }
+    });
 
     // ------------------------------------------------------------------- 프론트엔드 관련 추가 끝
 
@@ -227,49 +240,50 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     });
   }
 
-  onJoin(client: Client) {
-    console.log(`[DEBUG] 플레이어 입장: ${client.sessionId}`);
-
-    // ------------------------------------------------------------------- 프론트엔드 관련 추가
-    // 새로고침 관련 수정 필요
-
-    // 이미 존재하는 플레이어인지 확인
-    const existingPlayer = this.state.players.get(client.sessionId);
-    if (existingPlayer) {
-      console.log(`플레이어 ${client.sessionId}가 이미 존재합니다. 재연결로 처리합니다.`);
-      // 기존 플레이어 정보 유지하고 재연결 알림만 보냄
-      this.broadcast("playerReconnected", {
-        playerId: client.sessionId,
-        nickname: existingPlayer.nickname || '익명',
-        isHost: this.state.host === client.sessionId
-      });
-      return;
-    }
-
-    // ------------------------------------------------------------------- 프론트엔드 관련 추가
-    // 디버그할 때 확인용
-
-    // 게임이 진행 중일 때 새로운 플레이어 입장 거부
+  async onJoin(client: Client, options: any) {
     if (this.state.round > 0) {
-      console.log(`[DEBUG] 게임 진행 중 - 새로운 플레이어 입장 거부: ${client.sessionId}`);
-      client.send("joinRejected", { reason: "Game is already in progress." });
-      return;
+      throw new Error("게임이 이미 시작되었습니다.");
     }
-
-    // ------------------------------------------------------------------- 프론트엔드 관련 추가 끝
 
     const player = new PlayerState();
     player.sessionId = client.sessionId;
+    if (options.authToken) {
+      try {
+        const decoded = jwt.verify(options.authToken, process.env.JWT_SECRET) as JwtPayload & { userId?: number };
+        player.userId = decoded.userId ?? null; // JWT payload에 userId가 들어있다고 가정
+        // ratingMu, ratingSigma setting
+        if (player.userId !== null) {
+          // DB에서 rating 값 조회 (예: Prisma 사용)
+          const user = await prisma.user.findUnique({
+            where: { id: player.userId },
+            select: { rating_mu: true, rating_sigma: true }
+          });
+
+          if (user) {
+            player.ratingMu = user.rating_mu;
+            player.ratingSigma = user.rating_sigma;
+          } else {
+            // DB에 유저가 없으면 기본값 할당
+            player.ratingMu = DEFAULT_RATING_MU;
+            player.ratingSigma = DEFAULT_RATING_SIGMA;
+          }
+        } else {
+          // 비로그인 유저 기본값
+          player.ratingMu = DEFAULT_RATING_MU;
+          player.ratingSigma = DEFAULT_RATING_SIGMA;
+        }
+      } catch (err) {
+        player.userId = null; // 비로그인/비정상 토큰
+        player.ratingMu = DEFAULT_RATING_MU
+        player.ratingSigma = DEFAULT_RATING_SIGMA
+      }
+    } else {
+      player.userId = null; // 비로그인 유저
+      player.ratingMu = DEFAULT_RATING_MU
+      player.ratingSigma = DEFAULT_RATING_SIGMA
+    }
     this.state.players.set(client.sessionId, player);
     this.state.playerOrder.unshift(client.sessionId);
-
-    // 게임이 진행 중일 때 새로운 플레이어가 입장하면 nowPlayerIndex 조정
-    if (this.state.round > 0) {
-      console.log(`[DEBUG] 게임 진행 중 새로운 플레이어 입장 - 기존 nowPlayerIndex: ${this.state.nowPlayerIndex}`);
-      // 새로운 플레이어가 맨 앞에 추가되었으므로 인덱스를 1씩 증가
-      this.state.nowPlayerIndex += 1;
-      console.log(`[DEBUG] nowPlayerIndex 조정됨: ${this.state.nowPlayerIndex}`);
-    }
 
     if (this.state.host === "") {
       this.state.host = client.sessionId;
@@ -338,12 +352,16 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
   }
 
   startGame() {
-    // easyMode 설정: 플레이어 가운데 하나라도 easyMode true면 활성화
+    // easyMode 설정은 각 플레이어의 설정을 따르며, 방 전체의 easyMode는 플레이어 중 한 명이라도 true이면 true가 됨.
+    // 이 로직은 handleEasyMode에서 처리되므로 여기서는 별도 설정 안 함.
     this.state.easyMode = [...this.state.players.values()].some(p => p.easyMode);
     this.state.maxNumber = this.maxNumberMap[this.state.players.size] ?? 15;
 
     // 초기화 작업 예: 턴순, 라운드 등
     this.state.round = 1;
+
+    // 게임이 시작되면 방을 잠금
+    this.lock();
   }
 
   startRound() {
@@ -477,7 +495,7 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     });
   }
 
-  endRound() {
+  async endRound() {
     // 1. 필요한 모든 데이터를 계산합니다.
     const scoreBeforeCalculation = Array.from(this.state.players.entries()).map(([id, p]) => ({
       playerId: id,
@@ -512,54 +530,110 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       isGameEnd: this.state.round >= this.state.totalRounds,
     };
 
-    // 4. 하나의 'roundEnded' 메시지로 모든 데이터를 브로드캐스트합니다.
-    this.broadcast("roundEnded", comprehensiveResult);
-    if (comprehensiveResult.isGameEnd) {
-      this.broadcast("gameEnded", comprehensiveResult);
-    }
-
-    // 5. 서버의 플레이어 상태에 실제 누적 점수를 업데이트합니다.
+    // 4. 서버의 플레이어 상태에 실제 누적 점수를 업데이트합니다.
     for (const [sessionId, diffScore] of scoreDiffMap.entries()) {
       const player = this.state.players.get(sessionId);
       if (!player) continue;
       player.score += diffScore; // 서버에만 누적 점수 반영
     }
 
-    // 다음 라운드 준비 상태 초기화
+    // 5. 다음 라운드 준비 상태 초기화
     for (const player of this.state.players.values()) {
       player.readyForNextRound = false;
     }
 
-    // 라운드 진행, 전체 라운드 종료 시 게임 종료
-    if (this.state.round >= this.state.totalRounds) {
-      this.endGame();
+    // 6. 라운드 결과를 항상 클라이언트에 전송합니다.
+    this.broadcast("roundEnded", comprehensiveResult);
+
+    // 7. 게임 종료 여부를 확인하고 후속 조치를 취합니다.
+    if (comprehensiveResult.isGameEnd) {
+      // 마지막 라운드이므로, 백그라운드에서 DB 저장을 시작합니다.
+      console.log(`[DEBUG] 마지막 라운드 종료. endGame()을 호출하여 DB 저장을 시작합니다.`);
+      this.endGame().catch(e => console.error("[ERROR] endGame 실행 중 오류 발생:", e));
     } else {
-      this.state.round += 1;
-      // 첫 번째 라운드가 아닐 때만 다음 라운드 대기 상태 시작
-      if (this.state.round > 1) {
-        this.broadcast("waitingForNextRound");
-      }
+      // 게임이 계속되면 다음 라운드 준비
+      this.state.round++;
+      this.broadcast("waitingForNextRound");
     }
   }
 
-  endGame() {
+  async endGame() {
+    console.log(`[DEBUG] endGame() 실행 시작`);
     // 1) 최종 점수 수집
     const finalScores = Array.from(this.state.players.entries()).map(([sessionId, player]) => ({
       playerId: sessionId,
+      userId: player.userId,
       score: player.score,
       nickname: player.nickname,
-      remainingTiles: player.hand ? player.hand.length : 0 // 남은 패 개수 추가
+      rating_mu_before: player.ratingMu,
+      rating_sigma_before: player.ratingSigma
     }));
 
-    // 2) 최종 점수 클라이언트에 방송
-    this.broadcast("gameEnded", { finalScores });
+    const finalScoresWithRank = calculateRanks(finalScores);
+    const finalScoresWithRating = calculateRatings(finalScoresWithRank);
 
-    // 3) 게임 상태 초기화 또는 대기 상태로 전환
-    this.resetGameState();
+    const dbSaveResults = [];
+
+    // 4) 로그인 유저에 대해서만 DB 저장
+    for (const playerData of finalScoresWithRating) {
+      const { userId, score, rank, rating_mu_before, rating_sigma_before, rating_mu_after, rating_sigma_after } = playerData;
+      
+      if (!userId) {
+        dbSaveResults.push({ userId: null, success: false, reason: 'Not a logged-in user' });
+        continue;
+      }
+
+      console.log(`[DEBUG] 유저 ${userId}의 DB 저장을 시도합니다.`);
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.gameHistory.create({
+            data: {
+              userId,
+              playerCount: finalScores.length,
+              rank,
+              score,
+              scoresAll: finalScores.map(f => f.score),
+              rating_mu_before,
+              rating_sigma_before,
+              rating_mu_after,
+              rating_sigma_after,
+              gameId: this.roomId,
+            },
+          });
+
+          await tx.user.update({
+            where: { id: userId },
+            data: {
+              rating_mu: rating_mu_after,
+              rating_sigma: rating_sigma_after,
+            },
+          });
+        });
+        console.log(`[DEBUG] 유저 ${userId}의 게임 결과 및 레이팅 DB 저장 성공`);
+        dbSaveResults.push({ userId, success: true });
+      } catch (err) {
+        console.error(`[ERROR] 유저 ${userId}의 DB 저장 트랜잭션 실패:`, err);
+        const reason = err instanceof Error ? err.message : 'An unknown error occurred';
+        dbSaveResults.push({ userId, success: false, reason });
+      }
+    }
+
+    // 최종 결과를 state에 저장하여, 나중에 클라이언트가 요청할 수 있도록 함
+    this.finalGameResult = { 
+      finalScores: finalScoresWithRating,
+      dbSaveResults 
+    };
+    console.log(`[DEBUG] 최종 게임 결과가 생성되어 저장되었습니다.`);
+
+    // 클라이언트에게 게임이 완전히 종료되었음을 알림 (결과 데이터는 포함하지 않음)
+    this.broadcast("gameIsOver");
   }
 
 
   resetGameState() {
+    // 게임을 다시 할 수 있도록 방 잠금 해제
+    this.unlock();
+
     // 라운드, 점수, 각종 상태 초기화
     this.state.round = 0;
     this.state.lastType = 0;
