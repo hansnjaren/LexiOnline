@@ -346,16 +346,16 @@
 
 
 .board-card.new-card {
-  box-shadow: 0 0 0.8vh rgba(255, 165, 0, 0.6), 0 0 1.2vh rgba(255, 255, 0, 0.4);
+  box-shadow: 0 0 1.5vh rgba(255, 165, 0, 0.8), 0 0 2.5vh rgba(255, 255, 0, 0.6);
   animation: glow 2s ease-in-out infinite alternate;
 }
 
 @keyframes glow {
   from {
-    box-shadow: 0 0 0.8vh rgba(255, 165, 0, 0.6), 0 0 1.2vh rgba(255, 255, 0, 0.4);
+    box-shadow: 0 0 1.5vh rgba(255, 165, 0, 0.8), 0 0 2.5vh rgba(255, 255, 0, 0.5);
   }
   to {
-    box-shadow: 0 0 1.2vh rgba(255, 165, 0, 0.8), 0 0 1.8vh rgba(255, 255, 0, 0.6);
+    box-shadow: 0 0 2.5vh rgba(255, 165, 0, 1.0), 0 0 3.5vh rgba(255, 255, 0, 0.7);
   }
 }
 
