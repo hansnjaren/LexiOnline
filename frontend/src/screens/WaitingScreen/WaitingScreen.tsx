@@ -441,44 +441,70 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
         <div className="game-settings">
           <h2>게임 설정</h2>
           <div className="settings-row">
-            <div className="rounds-setting">
-              <label htmlFor="rounds">라운드 수:</label>
-              <CustomDropdown
-                value={rounds}
-                onChange={(value) => {
-                  setRounds(value);
-                  const room = ColyseusService.getRoom();
-                  if (room) {
-                    room.send('changeRounds', { rounds: value });
-                  }
-                }}
-                options={[
-                  { value: 1, label: '1라운드' },
-                  { value: 2, label: '2라운드' },
-                  { value: 3, label: '3라운드' },
-                  { value: 4, label: '4라운드' },
-                  { value: 5, label: '5라운드' },
-                ]}
-                disabled={!isHost}
-              />
-            </div>
+                         <div className="rounds-setting">
+               <label htmlFor="rounds">라운드 수:</label>
+               {isHost ? (
+                 <CustomDropdown
+                   value={rounds}
+                   onChange={(value) => {
+                     setRounds(value);
+                     const room = ColyseusService.getRoom();
+                     if (room) {
+                       room.send('changeRounds', { rounds: value });
+                     }
+                   }}
+                   options={[
+                     { value: 1, label: '1라운드' },
+                     { value: 2, label: '2라운드' },
+                     { value: 3, label: '3라운드' },
+                     { value: 4, label: '4라운드' },
+                     { value: 5, label: '5라운드' },
+                   ]}
+                 />
+               ) : (
+                 <div className="rounds-info">
+                   <span className="rounds-text">{rounds}라운드</span>
+                 </div>
+               )}
+             </div>
               <div className="easymode-setting">
-                <label>초보 모드:</label>
-                <label className="switch">
-                <input
-                  type="checkbox"
-                  checked={easyMode}
-                  onChange={() => {
-                    const room = ColyseusService.getRoom();
-                    if (room) {
-                      const newEasyMode = !easyMode;
-                      setEasyMode(newEasyMode);
-                      room.send('easyMode', { easyMode: newEasyMode });
-                    }
-                  }}
-                />
-                <span className="slider round"></span>
-              </label>
+              <label>게임 모드:</label>
+              <div className="radio-group">
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="gameMode"
+                    value="normal"
+                    checked={!easyMode}
+                    onChange={() => {
+                      const room = ColyseusService.getRoom();
+                      if (room) {
+                        setEasyMode(false);
+                        room.send('easyMode', { easyMode: false });
+                      }
+                    }}
+                  />
+                  <span className="radio-custom"></span>
+                  <span className="radio-label">일반 모드</span>
+                </label>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="gameMode"
+                    value="easy"
+                    checked={easyMode}
+                    onChange={() => {
+                      const room = ColyseusService.getRoom();
+                      if (room) {
+                        setEasyMode(true);
+                        room.send('easyMode', { easyMode: true });
+                      }
+                    }}
+                  />
+                  <span className="radio-custom"></span>
+                  <span className="radio-label">초보 모드</span>
+                </label>
+              </div>
             </div>
           </div>
         </div>

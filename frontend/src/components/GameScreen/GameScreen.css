@@ -122,9 +122,8 @@
   font-size: 0.8vw;
   font-weight: bold;
   white-space: nowrap;
-  z-index: 10;
+  z-index: 9;
   border: 0.2vw solid #ffc107;
-  box-shadow: 0 0.2vw 0.4vw rgba(0, 0, 0, 0.2);
   transform: rotate(0deg);
 }
 
@@ -142,6 +141,7 @@
 
 .player-info {
   flex: 1;
+  z-index:11;
 }
 
 .player-nickname {
@@ -428,6 +428,7 @@
   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
   position: relative;
   overflow: hidden;
+  z-index:11;
 }
 
 .my-info-box.current-turn {
@@ -449,7 +450,7 @@
   font-size: 0.9vw;
   font-weight: bold;
   white-space: nowrap;
-  z-index: 10;
+  z-index: 9;
   border: 0.2vw solid #ffc107;
   box-shadow: 0 0.2vw 0.4vw rgba(0, 0, 0, 0.2);
   transform: rotate(-5deg);
