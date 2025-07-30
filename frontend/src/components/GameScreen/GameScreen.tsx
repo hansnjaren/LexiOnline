@@ -218,6 +218,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         // 단, 모드 변경 중일 때는 정렬 순서를 보호하기 위해 업데이트하지 않음
         const myPlayer = state.players.get(room.sessionId);
         if (myPlayer && myPlayer.hand && myPlayer.hand.length > 0 && !showCardDealAnimation && !isModeChangingRef.current && !hasBeenSortedRef.current) {
+          console.log('[DEBUG] onStateChange - hasBeenSortedRef.current:', hasBeenSortedRef.current);
+          console.log('[DEBUG] onStateChange - isModeChangingRef.current:', isModeChangingRef.current);
+          console.log('[DEBUG] onStateChange - showCardDealAnimation:', showCardDealAnimation);
           console.log('[DEBUG] 이미 라운드가 시작됨, 손패만 업데이트 (애니메이션 없이)');
           const maxNumber = state.maxNumber || 13;
           console.log('[DEBUG] state.maxNumber:', state.maxNumber);
@@ -235,6 +238,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
           
           console.log('[DEBUG] 변환된 handCards:', handCards.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
           console.log('[DEBUG] 현재 sortedHand (업데이트 전):', sortedHand.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+          console.log('[DEBUG] onStateChange - sortedHand 업데이트 조건 확인 완료, 업데이트 진행');
           
           setMyHand(handCards);
           
@@ -507,10 +511,44 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
               };
             });
             
+            console.log('[DEBUG] submitted - 제출 후 백엔드 손패:', myPlayer.hand);
+            console.log('[DEBUG] submitted - 변환된 handCards:', handCards.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+            
             // 카드 분배 애니메이션 없이 직접 업데이트
             setMyHand(handCards);
-            setSortedHand(handCards);
-            setVisibleHand(handCards); // visibleHand도 직접 업데이트
+            
+            // 정렬 상태 보호 플래그 설정 (모드 변경과 동일한 방식)
+            hasBeenSortedRef.current = true;
+            console.log('[DEBUG] submitted - hasBeenSortedRef.current를 true로 설정');
+            
+            // 정렬된 순서를 유지하면서 새로운 손패로 업데이트
+            if (sortedHand.length > 0 && sortedHand.length >= handCards.length) {
+              // 제출된 카드들의 originalNumber 목록
+              const submittedCardNumbers = message.cards;
+              console.log('[DEBUG] submitted - 제출된 카드 번호들:', submittedCardNumbers);
+              
+              // 기존 정렬된 순서에서 제출된 카드들을 제거하고 빈 자리를 채움
+              const updatedSortedHand = sortedHand
+                .filter(existingCard => {
+                  // 제출된 카드가 아닌 것만 유지
+                  return !submittedCardNumbers.includes(existingCard.originalNumber);
+                })
+                .map((existingCard, newIndex) => ({
+                  ...existingCard,
+                  id: newIndex // 새로운 인덱스로 업데이트 (빈 자리를 채우기 위해)
+                }));
+              
+              setSortedHand(updatedSortedHand);
+              console.log('[DEBUG] submitted - 정렬 순서 유지하여 sortedHand 업데이트 (빈 자리 채움):', updatedSortedHand.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+            } else {
+              // sortedHand가 비어있는 경우에만 초기 상태로 설정
+              setSortedHand(handCards);
+              console.log('[DEBUG] submitted - sortedHand가 비어있어서 초기 상태로 설정:', handCards.map((c: any) => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })));
+            }
+            
+            setVisibleHand(handCards);
+            
+            console.log('[DEBUG] submitted - 손패 업데이트 완료, 정렬 순서 유지됨, hasBeenSortedRef = true');
           }
         }
       }
@@ -1499,18 +1537,26 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
           return null;
         }
         
-        // 백엔드에서 직접 손패 정보를 가져와서 카드 번호 찾기
+        // originalNumber를 직접 사용 (더 안전한 방법)
+        if (selectedCard.originalNumber !== undefined) {
+          console.log(`[DEBUG] selectedCard.originalNumber 사용: ${selectedCard.originalNumber}`);
+          return selectedCard.originalNumber;
+        }
+        
+        // 백엔드에서 직접 손패 정보를 가져와서 카드 번호 찾기 (fallback)
         const room = ColyseusService.getRoom();
         if (room) {
           const myPlayer = room.state.players.get(room.sessionId);
           if (myPlayer && myPlayer.hand) {
+            console.log('[DEBUG] 백엔드 손패에서 카드 찾기:', myPlayer.hand);
             // 백엔드 손패에서 해당 카드의 번호 찾기
             for (const cardNumber of myPlayer.hand) {
               const maxNumber = room.state.maxNumber || 13;
-              console.log('[DEBUG] maxNumber from backend:', maxNumber, 'cardNumber:', cardNumber);
               const color = getCardColorFromNumber(cardNumber, maxNumber);
               const value = getCardValueFromNumber(cardNumber, maxNumber);
+              console.log(`[DEBUG] 비교: cardNumber=${cardNumber}, color=${color}, value=${value} vs selectedCard.color=${selectedCard.color}, selectedCard.value=${selectedCard.value}`);
               if (color === selectedCard.color && value === selectedCard.value) {
+                console.log(`[DEBUG] 매칭된 카드 번호: ${cardNumber}`);
                 return cardNumber;
               }
             }
