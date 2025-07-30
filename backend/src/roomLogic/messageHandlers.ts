@@ -16,6 +16,35 @@ export interface IMyRoom extends Room<MyRoomState> {
   endRound(): void;
 }
 
+// 정렬 순서 저장 메시지 처리
+export function handleSortOrder(room: IMyRoom, client: Client, data: any) {
+  const player = room.state.players.get(client.sessionId);
+  if (!player) {
+    client.send("sortOrderRejected", { reason: "Player not found." });
+    return;
+  }
+
+  const sortOrder: number[] = data.sortOrder;
+  
+  // 정렬 순서가 현재 손패의 카드들로만 구성되어 있는지 확인
+  for (const cardId of sortOrder) {
+    if (!player.hand.includes(cardId)) {
+      client.send("sortOrderRejected", { reason: "Invalid card in sort order." });
+      return;
+    }
+  }
+
+  // 정렬 순서 저장
+  player.sortedHand.clear();
+  for (const cardId of sortOrder) {
+    player.sortedHand.push(cardId);
+  }
+
+  console.log(`[DEBUG] 정렬 순서 저장: player=${client.sessionId}, sortOrder=${sortOrder.join(', ')}`);
+  console.log(`[DEBUG] 저장된 sortedHand: ${Array.from(player.sortedHand).join(', ')}`);
+  client.send("sortOrderSaved", { success: true });
+}
+
 // submit 메시지 처리
 export function handleSubmit(room: IMyRoom, client: Client, data: any) {
   const submitCards: number[] = data.submitCards.map((item: string) => parseInt(item, 10));
@@ -111,6 +140,14 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
 
   // 제출 카드 손패에서 제거
   removeCardsFromHand(player.hand, submitCards);
+  
+  // 정렬 순서에서도 제출된 카드들 제거
+  for (const card of submitCards) {
+    const index = player.sortedHand.indexOf(card);
+    if (index !== -1) {
+      player.sortedHand.splice(index, 1);
+    }
+  }
 
   // pass 스티커 때문에 추가함
   // 모든 플레이어의 pass 상태 리셋 (새로운 패가 제출되었으므로)
