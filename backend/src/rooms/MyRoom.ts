@@ -478,33 +478,52 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
   }
 
   endRound() {
-    if (this.state.easyMode) {
-      const scoreMatrix = calculateRoundScoreMatrix(this.state.players, this.state.maxNumber);
-      this.broadcast("scoreMatrixUpdate", { scoreMatrix });
-    }
-
+    // 1. 필요한 모든 데이터를 계산합니다.
+    const scoreBeforeCalculation = Array.from(this.state.players.entries()).map(([id, p]) => ({
+      playerId: id,
+      score: p.score,
+    }));
+    
+    const scoreMatrix = calculateRoundScoreMatrix(this.state.players, this.state.maxNumber);
     const scoreDiffMap = calculateRoundScores(this.state.players, this.state.maxNumber);
 
+    // 2. 최종 라운드 결과 객체를 생성합니다.
+    const finalScores = Array.from(this.state.players.entries()).map(([id, p]) => ({
+      playerId: id,
+      score: p.hand ? p.hand.length : 0, // 프론트엔드 순위 표시는 남은 타일 수 기준
+      nickname: p.nickname || '익명',
+      scoreDiff: scoreDiffMap.get(id) || 0,
+      remainingTiles: p.hand ? p.hand.length : 0,
+    })).sort((a, b) => a.score - b.score);
+
+    // 3. 모든 데이터를 하나의 객체로 묶습니다.
+    const finalHands: Record<string, number[]> = {};
+    this.state.players.forEach((player, sessionId) => {
+      finalHands[sessionId] = Array.from(player.hand);
+    });
+
+    const comprehensiveResult = {
+      scoreBeforeCalculation,
+      scoreMatrix,
+      scores: finalScores, // roundResult의 scores와 동일
+      finalHands, // 모든 플레이어의 최종 패 정보 추가
+      maxNumber: this.state.maxNumber, // 검증 로직을 위해 maxNumber 추가
+      round: this.state.round,
+      isGameEnd: this.state.round >= this.state.totalRounds,
+    };
+
+    // 4. 하나의 'roundEnded' 메시지로 모든 데이터를 브로드캐스트합니다.
+    this.broadcast("roundEnded", comprehensiveResult);
+    if (comprehensiveResult.isGameEnd) {
+      this.broadcast("gameEnded", comprehensiveResult);
+    }
+
+    // 5. 서버의 플레이어 상태에 실제 누적 점수를 업데이트합니다.
     for (const [sessionId, diffScore] of scoreDiffMap.entries()) {
       const player = this.state.players.get(sessionId);
       if (!player) continue;
-      player.score += diffScore; // 기존 점수에 차이만큼 가감
+      player.score += diffScore; // 서버에만 누적 점수 반영
     }
-
-    // 라운드 결과 정보를 클라이언트에 전송
-    const roundResult = {
-      scores: Array.from(this.state.players.entries()).map(([id, p]) => ({
-        playerId: id,
-        score: p.score,
-        nickname: p.nickname || '익명',
-        scoreDiff: scoreDiffMap.get(id) || 0,
-        remainingTiles: p.hand ? p.hand.length : 0 // 남은 패 개수 추가
-      })),
-      round: this.state.round,
-      isGameEnd: false
-    };
-
-    this.broadcast("roundEnded", roundResult);
 
     // 다음 라운드 준비 상태 초기화
     for (const player of this.state.players.values()) {
@@ -512,17 +531,10 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     }
 
     // 라운드 진행, 전체 라운드 종료 시 게임 종료
-    this.state.round += 1;
-    if(this.state.round > this.state.totalRounds) {
-      // 게임 종료 시 최종 결과 전송
-      const finalResult = {
-        ...roundResult,
-        round: this.state.round - 1, // 마지막 라운드 번호
-        isGameEnd: true
-      };
-      this.broadcast("gameEnded", finalResult);
+    if (this.state.round >= this.state.totalRounds) {
       this.endGame();
     } else {
+      this.state.round += 1;
       // 첫 번째 라운드가 아닐 때만 다음 라운드 대기 상태 시작
       if (this.state.round > 1) {
         this.broadcast("waitingForNextRound");
