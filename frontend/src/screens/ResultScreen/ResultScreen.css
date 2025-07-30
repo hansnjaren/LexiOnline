@@ -10,6 +10,60 @@
   overflow: hidden;
 }
 
+/* 로딩 화면 스타일 */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #0f1419 0%, #1e2a3a 25%, #2d3a4a 50%, #1e2a3a 75%, #0f1419 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(0.5vh);
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3vh;
+}
+
+.loading-spinner {
+  width: 8vh;
+  height: 8vh;
+  border: 0.5vh solid rgba(255, 255, 255, 0.2);
+  border-top: 0.5vh solid #ffd700;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.winner-message {
+  color: #ffd700;
+  font-size: 3vh;
+  font-weight: bold;
+  text-align: center;
+  text-shadow: 0 0 1vh rgba(255, 215, 0, 0.5);
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    text-shadow: 0 0 1vh rgba(255, 215, 0, 0.5);
+  }
+  to {
+    text-shadow: 0 0 2vh rgba(255, 215, 0, 0.8), 0 0 3vh rgba(255, 215, 0, 0.6);
+  }
+}
+
 .result-screen::before {
   content: '';
   position: absolute;

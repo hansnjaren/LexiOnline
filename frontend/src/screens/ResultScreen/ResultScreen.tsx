@@ -107,6 +107,10 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
   const [roundResult, setRoundResult] = useState<RoundResult | null>(initialRoundResult || null);
   const [actualPlayerCount, setActualPlayerCount] = useState(playerCount);
   const [isReadyForAnimation, setIsReadyForAnimation] = useState(false);
+  const [showLoading, setShowLoading] = useState(true);
+  const [winnerName, setWinnerName] = useState('');
+  const [loadingStartTime, setLoadingStartTime] = useState(0);
+  const [loadingInitialized, setLoadingInitialized] = useState(false);
 
   // 각 타일카운트 원의 ref를 개별적으로 생성
   const player0Ref = useRef<HTMLDivElement>(null);
@@ -150,10 +154,10 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
     
     // 모든 위치가 계산되면 애니메이션 준비 완료
     const allPositionsCalculated = Object.values(newCenters).every(pos => pos !== null);
-    if (allPositionsCalculated && !isReadyForAnimation) {
+    if (allPositionsCalculated && !isReadyForAnimation && !showLoading) {
       setIsReadyForAnimation(true);
     }
-  }, [showArrow, currentTransferStep, actualPlayerCount, isReadyForAnimation]);
+  }, [showArrow, currentTransferStep, actualPlayerCount, isReadyForAnimation, showLoading]);
 
   useEffect(() => {
     // Colyseus 서비스에서 라운드 결과 정보 가져오기
@@ -200,6 +204,11 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
         
         console.log('현재 상태로 결과 구성:', currentResult);
         setRoundResult(currentResult);
+        
+        // 승자 이름 설정 (남은 카드 수가 가장 적은 사람)
+        if (scores.length > 0) {
+          setWinnerName(scores[0].nickname);
+        }
       }
 
       return () => {
@@ -209,57 +218,91 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
   }, []);
 
   useEffect(() => {
-    // 애니메이션 준비가 완료된 후에만 애니메이션 시작
-    if (!isReadyForAnimation) return;
+    // 로딩 화면이 끝난 후에만 애니메이션 시작
+    if (showLoading) return;
     
-    // 참가자 인원수에 따라 메시지 배열 동적 생성
-    const generateSteps = (count: number) => {
-      const steps = [];
+    // 로딩 화면이 끝난 후 약간의 지연을 두고 애니메이션 시작 (렌더링 완료 보장)
+    const startAnimation = () => {
+      // 참가자 인원수에 따라 메시지 배열 동적 생성
+      const generateSteps = (count: number) => {
+        const steps = [];
+        
+                // 1등부터 (count-1)등까지의 메시지 추가
+          for (let i = 1; i < count; i++) {
+            steps.push(`<span class="guide-tag">🔎 GUIDE</span> ${i}등과의 남은 타일 개수 차이만큼 코인을 전달`);
+          }
+        
+        // 마지막에 결과 집계 완료 메시지 추가
+        steps.push('결과 집계 완료!');
+        
+        return steps;
+      };
       
-              // 1등부터 (count-1)등까지의 메시지 추가
-        for (let i = 1; i < count; i++) {
-          steps.push(`<span class="guide-tag">🔎 GUIDE</span> ${i}등과의 남은 타일 개수 차이만큼 코인을 전달`);
+      const steps = generateSteps(actualPlayerCount);
+      let currentStep = 0;
+      setTransferMessage(steps[0]);
+      setCurrentTransferStep(0);
+      setShowArrow(true);
+      setShowButtons(false); // 애니메이션 시작 시 버튼 숨김
+      const timer = setInterval(() => {
+        if (currentStep < steps.length - 1) {
+          currentStep++;
+          setTransferMessage(steps[currentStep]);
+          setCurrentTransferStep(currentStep);
+          setShowArrow(true);
+        } else {
+          setShowArrow(false);
+          clearInterval(timer);
+          
+          // "결과 집계 완료!" 메시지가 표시된 후 2초 뒤에 버튼 표시
+          setTimeout(() => {
+            setTransferMessage('');
+            setShowButtons(true);
+          }, 2000);
         }
-      
-      // 마지막에 결과 집계 완료 메시지 추가
-      steps.push('결과 집계 완료!');
-      
-      return steps;
+      }, 4000);
+      return () => clearInterval(timer);
     };
     
-    const steps = generateSteps(actualPlayerCount);
-    let currentStep = 0;
-    setTransferMessage(steps[0]);
-    setCurrentTransferStep(0);
-    setShowArrow(true);
-    setShowButtons(false); // 애니메이션 시작 시 버튼 숨김
-    const timer = setInterval(() => {
-      if (currentStep < steps.length - 1) {
-        currentStep++;
-        setTransferMessage(steps[currentStep]);
-        setCurrentTransferStep(currentStep);
-        setShowArrow(true);
-      } else {
-        setShowArrow(false);
-        clearInterval(timer);
-        
-        // "결과 집계 완료!" 메시지가 표시된 후 2초 뒤에 버튼 표시
-        setTimeout(() => {
-          setTransferMessage('');
-          setShowButtons(true);
-        }, 2000);
-      }
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [actualPlayerCount, isReadyForAnimation]);
+    // 500ms 지연 후 애니메이션 시작 (렌더링 완료 보장)
+    const animationTimer = setTimeout(startAnimation, 500);
+    return () => clearTimeout(animationTimer);
+  }, [actualPlayerCount, showLoading]);
 
   // roundResult 변경 감지
   useEffect(() => {
     console.log('roundResult 변경됨:', roundResult);
     if (roundResult?.scores) {
       console.log('scores 상세:', roundResult.scores);
+      
+      // 승자 이름 설정 (남은 카드 수가 가장 적은 사람)
+      if (roundResult.scores.length > 0) {
+        setWinnerName(roundResult.scores[0].nickname);
+      }
     }
   }, [roundResult]);
+
+  // 로딩 화면 타이머 관리
+  useEffect(() => {
+    if (showLoading && winnerName && !loadingInitialized) {
+      setLoadingInitialized(true);
+      setLoadingStartTime(Date.now());
+      
+      const checkLoadingComplete = () => {
+        const elapsed = Date.now() - loadingStartTime;
+        const minLoadingTime = 3000; // 최소 3초
+        
+        // 3초가 지났으면 로딩 화면 종료
+        if (elapsed >= minLoadingTime) {
+          setShowLoading(false);
+        } else {
+          setTimeout(checkLoadingComplete, 100);
+        }
+      };
+      
+      checkLoadingComplete();
+    }
+  }, [showLoading, winnerName, loadingStartTime, loadingInitialized]);
 
   const handlePlayAgain = () => {
     console.log('다시하기');
@@ -280,6 +323,16 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
 
   return (
     <div className="result-screen">
+      {/* 로딩 화면 */}
+      {showLoading && (
+        <div className="loading-overlay">
+          <div className="loading-content">
+            <div className="loading-spinner"></div>
+            <h2 className="winner-message">{winnerName}님이 승리했습니다!</h2>
+          </div>
+        </div>
+      )}
+      
       <div className="result-container">
         {/* 상단 섹션 - 상대방 정보 */}
         <div className="opponent-section">
