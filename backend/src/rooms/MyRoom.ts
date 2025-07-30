@@ -13,6 +13,7 @@ import {
   handlePass,
   handleReady,
   handleEasyMode,
+  handleSortOrder,
   IMyRoom,
 } from "../roomLogic/messageHandlers";
 
@@ -47,6 +48,7 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     this.onMessage("pass", (client) => handlePass(this, client));
     this.onMessage("ready", (client, data) => handleReady(this, client, data));
     this.onMessage("easyMode", (client, data) => handleEasyMode(this, client, data));
+    this.onMessage("sortOrder", (client, data) => handleSortOrder(this, client, data));
     
     // ------------------------------------------------------------------- 프론트엔드 관련 추가
 
@@ -117,13 +119,20 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       const myPlayer = this.state.players.get(client.sessionId);
       const myHand = myPlayer && myPlayer.hand ? Array.from(myPlayer.hand) : [];
       
+      // 정렬된 손패 순서가 있으면 사용, 없으면 원본 순서 사용
+      const sortedHand = myPlayer && myPlayer.sortedHand.length > 0 
+        ? Array.from(myPlayer.sortedHand)
+        : myHand;
+      
       console.log(`[DEBUG] 플레이어 손패: ${myHand.join(', ')}`);
+      console.log(`[DEBUG] 정렬된 손패: ${sortedHand.join(', ')}`);
+      console.log(`[DEBUG] sortedHand 길이: ${myPlayer?.sortedHand.length || 0}`);
       
       client.send("playerInfoResponse", {
         players: allPlayers,
         playerOrder: this.state.playerOrder.slice(),
         isGameStarted: this.state.round > 0,
-        myHand: myHand,
+        myHand: sortedHand, // 정렬된 순서로 전송
         maxNumber: this.state.maxNumber,
         round: this.state.round,
         totalRounds: this.state.totalRounds
@@ -366,6 +375,8 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       const player = this.state.players.get(sessionId);
       if (player) {
         player.hand = new ArraySchema<number>(...hands[i]);
+        // 새로운 라운드이므로 정렬 순서 초기화
+        player.sortedHand.clear();
       }
     });
 
