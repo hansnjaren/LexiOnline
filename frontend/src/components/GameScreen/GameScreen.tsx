@@ -10,6 +10,7 @@ import cloudImage from '../../cloud.png';
 import CombinationGuide from './CombinationGuide';
 import GameGuide from './GameGuide';
 import CardDealAnimation from './CardDealAnimation';
+import CombinationWheel from './CombinationWheel';
 import ColyseusService from '../../services/ColyseusService';
 
 interface GameScreenProps {
@@ -1802,7 +1803,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
             {/* 중앙 - 현재 조합 및 버튼들 */}
             <div className="center-controls">
               <div className="current-combination">
-                <span>현재 조합: {getCurrentCombinationText()}</span>
+                <CombinationWheel 
+                  currentCombination={getCurrentCombinationText()}
+                  lastType={gameState.lastType}
+                  lastMadeType={gameState.lastMadeType}
+                />
               </div>
               <div className="control-buttons">
                 <button 

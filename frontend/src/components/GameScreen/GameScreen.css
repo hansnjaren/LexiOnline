@@ -497,20 +497,21 @@
   flex: 1;
   border: 0.15vw solid rgba(255, 255, 255, 0.2);
   border-radius: 0.6vw;
-  padding: 2vh 2vw;
-  min-height: 2.5vh;
+  padding: 1vh 2vw;
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(5px);
 }
 
 .current-combination {
-  font-size: 1.2vw;
-  font-weight: bold;
   flex: 1;
-  text-align: center;
-  box-shadow: none;
-  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2vw;
+  margin-bottom: 0.9vw;
 }
+
+
 
 .control-buttons {
   display: flex;
@@ -1274,4 +1275,53 @@
   background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
   color: #ccc;
   box-shadow: 0 0.2vh 0.5vh rgba(108, 117, 125, 0.3);
+}
+
+/* 반응형 휠 애니메이션 스타일 */
+@media (max-width: 1440px) {
+  .combination-wheel-container {
+    width: 10vw;
+    height: 2vh;
+  }
+  
+  .combination-item {
+    font-size: 1.3vw;
+    height: 2vh;
+  }
+}
+
+@media (min-width: 1440px) {
+  .combination-wheel-container {
+    width: 8vw;
+    height: 2vh;
+  }
+  
+  .combination-item {
+    font-size: 1.1vw;
+    height: 2vh;
+  }
+}
+
+@media (min-width: 1920px) {
+  .combination-wheel-container {
+    width: 7vw;
+    height: 2vh;
+  }
+  
+  .combination-item {
+    font-size: 1vw;
+    height: 2vh;
+  }
+}
+
+@media (min-width: 2560px) {
+  .combination-wheel-container {
+    width: 6vw;
+    height: 2vh;
+  }
+  
+  .combination-item {
+    font-size: 0.9vw;
+    height: 2vh;
+  }
 }
