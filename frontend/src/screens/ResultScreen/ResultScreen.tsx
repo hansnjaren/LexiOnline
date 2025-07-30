@@ -158,15 +158,27 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
     for (let i = 0; i < rankedPlayers.length; i++) {
       const player = rankedPlayers[i];
       const key = `player${i}`;
-      const tile = playerRefs.current[key];
+      const playerBox = playerRefs.current[key];
       const layout = layoutRef.current;
-      if (tile && layout) {
-        const tileRect = tile.getBoundingClientRect();
-        const layoutRect = layout.getBoundingClientRect();
-        newCenters[player.playerId] = {
-          x: tileRect.left + tileRect.width / 2 - layoutRect.left,
-          y: tileRect.top + tileRect.height / 2 - layoutRect.top,
-        };
+      if (playerBox && layout) {
+        // tile-count 클래스를 찾아서 그 중심점을 계산
+        const tileCountElement = playerBox.querySelector('.tile-count');
+        if (tileCountElement) {
+          const tileCountRect = tileCountElement.getBoundingClientRect();
+          const layoutRect = layout.getBoundingClientRect();
+          newCenters[player.playerId] = {
+            x: tileCountRect.left + tileCountRect.width / 2 - layoutRect.left,
+            y: tileCountRect.top + tileCountRect.height / 2 - layoutRect.top,
+          };
+        } else {
+          // tile-count를 찾을 수 없는 경우 기존 방식 사용
+          const tileRect = playerBox.getBoundingClientRect();
+          const layoutRect = layout.getBoundingClientRect();
+          newCenters[player.playerId] = {
+            x: tileRect.left + tileRect.width / 2 - layoutRect.left,
+            y: tileRect.top + tileRect.height / 2 - layoutRect.top,
+          };
+        }
       }
     }
     setCenters(newCenters);

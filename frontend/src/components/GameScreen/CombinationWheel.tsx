@@ -64,13 +64,13 @@ const CombinationWheel: React.FC<CombinationWheelProps> = ({
       // 단계별 애니메이션 실행
       const animateStepByStep = async () => {
         const steps = Math.abs(newIndex - currentIndex);
-        const stepDelay = 250; // 각 단계별 지연 시간 (더 빠르게)
+        const stepDelay = 150; // 각 단계별 지연 시간 (더 빠르게)
         
         if (steps === 1) {
           // 한 칸만 이동하는 경우
-          swiperRef.current.swiper.slideTo(newIndex, 500, false);
+          swiperRef.current.swiper.slideTo(newIndex, 200, false);
           setCurrentIndex(newIndex);
-          setTimeout(() => setIsAnimating(false), 500);
+          setTimeout(() => setIsAnimating(false), 200);
         } else {
           // 여러 칸을 이동하는 경우 - 단계별로 실행
           const startIndex = currentIndex;
@@ -83,7 +83,7 @@ const CombinationWheel: React.FC<CombinationWheelProps> = ({
             await new Promise(resolve => {
               setTimeout(() => {
                 if (swiperRef.current && swiperRef.current.swiper) {
-                  swiperRef.current.swiper.slideTo(stepIndex, 350, false);
+                  swiperRef.current.swiper.slideTo(stepIndex, 200, false);
                   setCurrentIndex(stepIndex);
                 }
                 resolve(true);
@@ -94,10 +94,10 @@ const CombinationWheel: React.FC<CombinationWheelProps> = ({
           // 최종 위치로 이동하고 애니메이션 완료
           setTimeout(() => {
             if (swiperRef.current && swiperRef.current.swiper) {
-              swiperRef.current.swiper.slideTo(newIndex, 350, false);
+              swiperRef.current.swiper.slideTo(newIndex, 200, false);
               setCurrentIndex(newIndex);
             }
-            setTimeout(() => setIsAnimating(false), 350);
+            setTimeout(() => setIsAnimating(false), 200);
           }, steps * stepDelay);
         }
       };
@@ -124,7 +124,7 @@ const CombinationWheel: React.FC<CombinationWheelProps> = ({
         }}
         className="combination-swiper"
         initialSlide={0}
-        speed={800}
+        speed={200}
         spaceBetween={0}
         slidesPerView={3}
         centeredSlides={true}
