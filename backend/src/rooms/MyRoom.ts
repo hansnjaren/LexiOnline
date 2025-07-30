@@ -175,6 +175,22 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       this.broadcast("gameReset", {});
     });
 
+    // 라운드 넘기기 대기창 용도
+    // 현재 준비 상태 요청
+    this.onMessage("requestReadyStatus", (client) => {
+      console.log(`플레이어 ${client.sessionId}가 준비 상태를 요청함`);
+      
+      // 현재 준비된 플레이어들의 목록 전송
+      const readyPlayerIds = Array.from(this.state.players.entries())
+        .filter(([id, player]) => player.readyForNextRound)
+        .map(([id, player]) => id);
+      
+      client.send("readyStatusResponse", {
+        readyPlayers: readyPlayerIds,
+        totalPlayers: this.state.players.size
+      });
+    });
+
 
 
     // ------------------------------------------------------------------- 프론트엔드 관련 추가 끝
@@ -379,6 +395,7 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     this.state.lastHighestValue = -1;
     this.state.lastCards = new ArraySchema<number>();
     this.state.lastPlayerIndex = -1;
+    this.state.currentTurnId = 0; // 턴 ID 초기화
 
     // 7) 카드 분배 후 각 플레이어마다 자신의 상태 보내기
     console.log(`[DEBUG] roundStart 메시지 전송 시작 - 플레이어 수: ${this.state.playerOrder.length}`);

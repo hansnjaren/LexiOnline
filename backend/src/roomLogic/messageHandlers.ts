@@ -44,10 +44,18 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
     return;
   }
 
-  // lastType 0이면 첫 제출로 타입 자유, 0 아니면 길이 동일해야 함
-  if (room.state.lastType !== 0 && submitCards.length !== room.state.lastType) {
-    client.send("submitRejected", { reason: "Wrong cards: different type." });
-    return;
+  // lastType 0이면 첫 제출로 타입 자유
+  if (room.state.lastType !== 0) {
+    // 5장 조합인 경우 lastMadeType이 설정되어 있어야 함
+    if (submitCards.length === 5) {
+      if (room.state.lastMadeType === MADE_NONE) {
+        client.send("submitRejected", { reason: "Wrong cards: cannot submit 5 cards without made type." });
+        return;
+      }
+    } else if (submitCards.length !== room.state.lastType) {
+      client.send("submitRejected", { reason: "Wrong cards: different type." });
+      return;
+    }
   }
 
   const player = room.state.players.get(client.sessionId);
@@ -98,6 +106,7 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
     }
     room.state.lastMadeType = result.type;
     room.state.lastHighestValue = result.value;
+    room.state.lastType = 4; // 5장 조합을 나타내는 타입으로 설정
   }
 
   // 제출 카드 손패에서 제거
@@ -122,7 +131,9 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
 
   // 카드 위치 결정 (모든 유저에게 동일한 위치 보장)
   const boardSize = { rows: 4, cols: 15 }; // 기본 보드 크기
-  const currentTurnId = room.state.round; // 턴 ID로 라운드 번호 사용
+  // 카드 제출할 때마다 턴 ID 증가
+  room.state.currentTurnId++;
+  const currentTurnId = room.state.currentTurnId;
   
   // 게임 보드 동기화 관련
   // 현재 게임 보드 상태를 room.state에서 가져오기
@@ -154,7 +165,8 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
       cards: submitCards, 
       playerId: client.sessionId,
       position: positionResult.position,
-      maxNumber: room.state.maxNumber
+      maxNumber: room.state.maxNumber,
+      turnId: currentTurnId
     });
   } else {
     console.log(`[DEBUG] 카드 위치 결정 실패, 기본 위치 사용`);
@@ -174,7 +186,8 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
       cards: submitCards, 
       playerId: client.sessionId,
       position: defaultPosition,
-      maxNumber: room.state.maxNumber
+      maxNumber: room.state.maxNumber,
+      turnId: currentTurnId
     });
   }
 

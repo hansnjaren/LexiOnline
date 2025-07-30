@@ -88,10 +88,6 @@ export function evaluateMade(cards: number[], maxNumber: number): MadeEvalResult
 
   const isFlush = typeCount.size === 1;
   const isStraight = isStraightWithException(numbers, maxNumber);
-  
-  console.log(`[DEBUG] 족보 판별: isFlush=${isFlush}, isStraight=${isStraight}, typeCount.size=${typeCount.size}`);
-  console.log(`[DEBUG] 숫자 분포:`, Array.from(numCount.entries()));
-  console.log(`[DEBUG] 색상 분포:`, Array.from(typeCount.entries()));
 
   let four = false, three = false, two = false;
   for (const count of numCount.values()) {
@@ -99,6 +95,11 @@ export function evaluateMade(cards: number[], maxNumber: number): MadeEvalResult
     else if (count === 3) three = true;
     else if (count === 2) two = true;
   }
+  
+  console.log(`[DEBUG] 족보 판별: isFlush=${isFlush}, isStraight=${isStraight}, typeCount.size=${typeCount.size}`);
+  console.log(`[DEBUG] 숫자 분포:`, Array.from(numCount.entries()));
+  console.log(`[DEBUG] 색상 분포:`, Array.from(typeCount.entries()));
+  console.log(`[DEBUG] three=${three}, two=${two}, four=${four}`);
 
   let bestIndex = -1, bestType = -1, bestNumber = -1;
   for (let i = 0; i < numbers.length; i++) {

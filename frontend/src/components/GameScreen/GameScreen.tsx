@@ -161,6 +161,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     // 게임 화면에 진입했을 때 다음 라운드 대기 상태인지 확인 (round가 2 이상일 때만)
     if (room.state.round > 1 && !room.state.players.get(room.sessionId)?.readyForNextRound) {
       setWaitingForNextRound(true);
+      // 현재 준비 상태 요청
+      room.send('requestReadyStatus');
     }
 
     // 게임 상태 구독
@@ -304,11 +306,21 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       setReadyPlayers(new Set());
     });
 
+    // 준비 상태 응답
+    room.onMessage('readyStatusResponse', (message) => {
+      console.log('준비 상태 응답:', message);
+      const newReadyPlayers = new Set(message.readyPlayers as string[]);
+      setReadyPlayers(newReadyPlayers);
+    });
+
     // 다음 라운드 대기 상태 시작
     room.onMessage('waitingForNextRound', () => {
       console.log('다음 라운드 대기 상태 시작');
       setWaitingForNextRound(true);
       setReadyPlayers(new Set());
+      
+      // 현재 준비 상태 요청
+      room.send('requestReadyStatus');
     });
 
     room.onMessage('roundStart', (message) => {
@@ -384,7 +396,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
             row: message.position.row,
             col: message.position.col + index,
             isNew: true,
-            turnId: gameState.currentTurnId,
+            turnId: message.turnId || gameState.currentTurnId,
             submitTime: Date.now() // 제출 시간 기록
           };
         });
@@ -820,14 +832,17 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         return { canSubmit: false, reason: `순서가 낮습니다. 현재값: ${currentValue}, 이전값: ${gameState.lastHighestValue}` };
       }
     } else {
-      // 5장의 경우: 백엔드에서 evaluateMade로 검증하므로 여기서는 기본 검증만
-      // 실제 조합 검증은 백엔드에서 수행
+      // 5장의 경우: 백엔드와 동일한 evaluateMade 로직 구현
       const parsed = cardNumbers.map(card => parseCard(card, maxNumber));
       const numbers = parsed.map(c => c.number).sort((a, b) => a - b);
       const types = parsed.map(c => c.type);
-      
-      // 기본적인 스트레이트 플래시 검증
-      const isFlush = new Set(types).size === 1;
+
+      const numCount = new Map<number, number>();
+      const typeCount = new Map<number, number>();
+      numbers.forEach(n => numCount.set(n, (numCount.get(n) || 0) + 1));
+      types.forEach(t => typeCount.set(t, (typeCount.get(t) || 0) + 1));
+
+      const isFlush = typeCount.size === 1;
       
       // 백엔드와 동일한 스트레이트 검증 로직
       let isStraight = true;
@@ -848,8 +863,18 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       ) {
         isStraight = false;
       }
+
+      let four = false, three = false, two = false;
+      Array.from(numCount.values()).forEach(count => {
+        if (count === 4) four = true;
+        else if (count === 3) three = true;
+        else if (count === 2) two = true;
+      });
+
+      // 백엔드와 동일한 족보 판별 로직
+      const isValidCombo = isFlush && isStraight || four || (three && two) || isFlush || isStraight;
       
-      if (!isFlush || !isStraight) {
+      if (!isValidCombo) {
         return { canSubmit: false, reason: "5장 카드는 유효한 조합이어야 합니다" };
       }
       
@@ -1669,10 +1694,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
                 {Array.from({ length: boardSize.cols }, (_, colIndex) => {
                   const card = boardCards.find(c => c.row === rowIndex && c.col === colIndex);
                   
-                  // 가장 최근에 제출된 패인지 확인 (submitTime 기준)
-                  const cardsWithSubmitTime = boardCards.filter(c => c.submitTime !== undefined);
-                  const maxSubmitTime = cardsWithSubmitTime.length > 0 ? Math.max(...cardsWithSubmitTime.map(c => c.submitTime!)) : 0;
-                  const isMostRecent = card && card.submitTime && card.submitTime === maxSubmitTime;
+                  // 가장 최근에 제출된 패인지 확인 (turnId 기준)
+                  const cardsWithTurnId = boardCards.filter(c => c.turnId !== undefined);
+                  const maxTurnId = cardsWithTurnId.length > 0 ? Math.max(...cardsWithTurnId.map(c => c.turnId!)) : 0;
+                  const isMostRecent = card && card.turnId && card.turnId === maxTurnId;
                   
                   return (
                     <div key={colIndex} className="board-slot">

@@ -271,7 +271,7 @@
 }
 
 .dropdown-option {
-  padding: 0.8vw 1.2vw;
+  padding: 0.3vw 1.2vw;
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 0.9vw;

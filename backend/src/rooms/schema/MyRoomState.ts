@@ -20,7 +20,7 @@ export class MyRoomState extends Schema {
 
   @type([ "string" ]) playerOrder = new ArraySchema<string>();
 
-  @type("int8") totalRounds = 5;
+  @type("int8") totalRounds = 3;
 
   @type("int8") round = 0;
 
@@ -35,5 +35,7 @@ export class MyRoomState extends Schema {
   @type([ "int8" ]) boardRows = new ArraySchema<number>(); // 각 카드의 행 위치
   @type([ "int8" ]) boardCols = new ArraySchema<number>(); // 각 카드의 열 위치
   @type([ "int8" ]) boardTurnIds = new ArraySchema<number>(); // 각 카드의 턴 ID
+
+  @type("int8") currentTurnId = 0; // 현재 턴 ID (카드 제출할 때마다 증가)
 
 }
