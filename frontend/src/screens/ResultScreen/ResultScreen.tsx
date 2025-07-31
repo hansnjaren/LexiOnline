@@ -46,7 +46,8 @@ const AnimatedArrow: React.FC<{
   from: { x: number; y: number } | null;
   to: { x: number; y: number } | null;
   visible: boolean;
-}> = ({ from, to, visible }) => {
+  amount?: number;
+}> = ({ from, to, visible, amount }) => {
   const ARROW_RADIUS = 35;
   const ARROW_HEAD_SIZE = 25;
   const [progress, setProgress] = React.useState(0);
@@ -87,14 +88,37 @@ const AnimatedArrow: React.FC<{
   const arrowHeadX = currentEndX + (ARROW_HEAD_SIZE * 0.4) * Math.cos(angle);
   const arrowHeadY = currentEndY + (ARROW_HEAD_SIZE * 0.4) * Math.sin(angle);
 
+  // 코인 숫자의 위치 계산 (화살표를 따라 이동)
+  const coinProgress = Math.min(progress * 1.2, 1); // 화살표보다 조금 빠르게 이동
+  const coinX = startX + (endX - startX) * coinProgress;
+  const coinY = startY + (endY - startY) * coinProgress;
+
   return (
-    <svg className="arrow-svg" width="600" height="600" style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 20 }}>
-      <line x1={startX} y1={startY} x2={currentEndX} y2={currentEndY} stroke="#ffd700" strokeWidth={7} strokeLinecap="round" />
-      <polygon
-        points={`${arrowHeadX},${arrowHeadY} ${arrowHeadX - ARROW_HEAD_SIZE * Math.cos(angle - 0.35)},${arrowHeadY - ARROW_HEAD_SIZE * Math.sin(angle - 0.35)} ${arrowHeadX - ARROW_HEAD_SIZE * Math.cos(angle + 0.35)},${arrowHeadY - ARROW_HEAD_SIZE * Math.sin(angle + 0.35)}`}
-        fill="#ffd700"
-      />
-    </svg>
+    <>
+      <svg className="arrow-svg" width="600" height="600" style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 20 }}>
+        <line x1={startX} y1={startY} x2={currentEndX} y2={currentEndY} stroke="#ffd700" strokeWidth={7} strokeLinecap="round" />
+        <polygon
+          points={`${arrowHeadX},${arrowHeadY} ${arrowHeadX - ARROW_HEAD_SIZE * Math.cos(angle - 0.35)},${arrowHeadY - ARROW_HEAD_SIZE * Math.sin(angle - 0.35)} ${arrowHeadX - ARROW_HEAD_SIZE * Math.cos(angle + 0.35)},${arrowHeadY - ARROW_HEAD_SIZE * Math.sin(angle + 0.35)}`}
+          fill="#ffd700"
+        />
+      </svg>
+      {amount && (
+        <div 
+          className="coin-amount"
+          style={{
+            position: 'absolute',
+            left: coinX,
+            top: coinY,
+            zIndex: 25,
+            transform: 'translate(-50%, -50%)',
+            animation: progress >= 0.8 ? 'coinArrive 0.5s ease-out' : 'coinFloat 1.5s ease-in-out infinite',
+            opacity: progress >= 0.8 ? 0.8 : 1
+          }}
+        >
+          {amount}
+        </div>
+      )}
+    </>
   );
 };
 // #endregion
@@ -158,15 +182,27 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
     for (let i = 0; i < rankedPlayers.length; i++) {
       const player = rankedPlayers[i];
       const key = `player${i}`;
-      const tile = playerRefs.current[key];
+      const playerBox = playerRefs.current[key];
       const layout = layoutRef.current;
-      if (tile && layout) {
-        const tileRect = tile.getBoundingClientRect();
-        const layoutRect = layout.getBoundingClientRect();
-        newCenters[player.playerId] = {
-          x: tileRect.left + tileRect.width / 2 - layoutRect.left,
-          y: tileRect.top + tileRect.height / 2 - layoutRect.top,
-        };
+      if (playerBox && layout) {
+        // tile-count 클래스를 찾아서 그 중심점을 계산
+        const tileCountElement = playerBox.querySelector('.tile-count');
+        if (tileCountElement) {
+          const tileCountRect = tileCountElement.getBoundingClientRect();
+          const layoutRect = layout.getBoundingClientRect();
+          newCenters[player.playerId] = {
+            x: tileCountRect.left + tileCountRect.width / 2 - layoutRect.left,
+            y: tileCountRect.top + tileCountRect.height / 2 - layoutRect.top,
+          };
+        } else {
+          // tile-count를 찾을 수 없는 경우 기존 방식 사용
+          const tileRect = playerBox.getBoundingClientRect();
+          const layoutRect = layout.getBoundingClientRect();
+          newCenters[player.playerId] = {
+            x: tileRect.left + tileRect.width / 2 - layoutRect.left,
+            y: tileRect.top + tileRect.height / 2 - layoutRect.top,
+          };
+        }
       }
     }
     setCenters(newCenters);
@@ -284,7 +320,7 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
       const receiver = playerMap.get(transfer.receiverId);
 
       if (giver && receiver) {
-        setTransferMessage(`<span class="guide-tag">${giver.nickname}</span> 님이 <span class="guide-tag">${receiver.nickname}</span> 님에게 <span class="guide-tag">${transfer.amount}</span> 코인 전달`);
+        setTransferMessage(`<span class="guide-tag">${giver.nickname}</span> 님이 <span class="guide-tag">${receiver.nickname}</span> 님에게 코인 전달`);
         
         setDisplayScores(currentScores => {
           const newScores = { ...currentScores };
@@ -335,7 +371,7 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
   // #region Render
   const getArrowProps = () => {
     if (!showArrow || currentTransferStep < 0 || transfers.length <= currentTransferStep) {
-      return { from: null, to: null, visible: false };
+      return { from: null, to: null, visible: false, amount: undefined };
     }
   
     const transfer = transfers[currentTransferStep];
@@ -344,10 +380,11 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
         from: centers[transfer.giverId] || null,
         to: centers[transfer.receiverId] || null,
         visible: true,
+        amount: transfer.amount,
       };
     }
     
-    return { from: null, to: null, visible: false };
+    return { from: null, to: null, visible: false, amount: undefined };
   };
 
   return (

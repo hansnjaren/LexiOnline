@@ -38,4 +38,8 @@ export class MyRoomState extends Schema {
 
   @type("int8") currentTurnId = 0; // 현재 턴 ID (카드 제출할 때마다 증가)
 
+  // 보드 크기 관리
+  @type("int8") currentBoardRows = 4; // 현재 보드 행 수
+  @type("int8") currentBoardCols = 15; // 현재 보드 열 수
+
 }

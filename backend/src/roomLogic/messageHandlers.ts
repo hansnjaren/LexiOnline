@@ -167,7 +167,7 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
   room.state.lastPlayerIndex = room.state.nowPlayerIndex;
 
   // 카드 위치 결정 (모든 유저에게 동일한 위치 보장)
-  const boardSize = { rows: 4, cols: 15 }; // 기본 보드 크기
+  let boardSize = { rows: room.state.currentBoardRows, cols: room.state.currentBoardCols }; // 현재 보드 크기
   // 카드 제출할 때마다 턴 ID 증가
   room.state.currentTurnId++;
   const currentTurnId = room.state.currentTurnId;
@@ -184,7 +184,33 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
   }
   
   // 위치 결정
-  const positionResult = findCardPosition(submitCards, boardCards, boardSize, currentTurnId);
+  let positionResult = findCardPosition(submitCards, boardCards, boardSize, currentTurnId);
+  
+  // 위치를 찾지 못한 경우 보드 크기 확장 시도
+  if (!positionResult.success) {
+    console.log(`[DEBUG] 카드 위치 결정 실패, 보드 크기 확장 시도`);
+    
+    // 15x4에서 20x5로 확장
+    if (room.state.currentBoardRows === 4 && room.state.currentBoardCols === 15) {
+      room.state.currentBoardRows = 5;
+      room.state.currentBoardCols = 20;
+      boardSize = { rows: 5, cols: 20 };
+      console.log(`[DEBUG] 보드 크기 확장: 15x4 -> 20x5`);
+      
+      // 확장된 보드로 다시 위치 찾기 시도
+      positionResult = findCardPosition(submitCards, boardCards, boardSize, currentTurnId);
+    }
+    // 20x5에서 25x6으로 확장
+    else if (room.state.currentBoardRows === 5 && room.state.currentBoardCols === 20) {
+      room.state.currentBoardRows = 6;
+      room.state.currentBoardCols = 25;
+      boardSize = { rows: 6, cols: 25 };
+      console.log(`[DEBUG] 보드 크기 확장: 20x5 -> 25x6`);
+      
+      // 확장된 보드로 다시 위치 찾기 시도
+      positionResult = findCardPosition(submitCards, boardCards, boardSize, currentTurnId);
+    }
+  }
   
   if (positionResult.success && positionResult.position) {
     console.log(`[DEBUG] 카드 위치 결정: row=${positionResult.position.row}, col=${positionResult.position.col}`);
@@ -203,7 +229,8 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
       playerId: client.sessionId,
       position: positionResult.position,
       maxNumber: room.state.maxNumber,
-      turnId: currentTurnId
+      turnId: currentTurnId,
+      boardSize: boardSize // 확장된 보드 크기도 함께 전송
     });
   } else {
     console.log(`[DEBUG] 카드 위치 결정 실패, 기본 위치 사용`);
@@ -224,7 +251,8 @@ export function handleSubmit(room: IMyRoom, client: Client, data: any) {
       playerId: client.sessionId,
       position: defaultPosition,
       maxNumber: room.state.maxNumber,
-      turnId: currentTurnId
+      turnId: currentTurnId,
+      boardSize: boardSize // 현재 보드 크기도 함께 전송
     });
   }
 
@@ -283,14 +311,21 @@ export function handlePass(room: IMyRoom, client: Client) {
 // ready 상태 변경 처리
 export function handleReady(room: IMyRoom, client: Client, data: any) {
   const player = room.state.players.get(client.sessionId);
-  if (!player) return;
+  if (!player) {
+    console.log(`[DEBUG] handleReady: 플레이어를 찾을 수 없음 - sessionId: ${client.sessionId}`);
+    return;
+  }
 
+  const oldReadyState = player.ready;
+  
   if (typeof data.ready === "boolean") {
     player.ready = data.ready;
   } else {
     // 토글 방식 (필요 시 주석 해제)
     // player.ready = !player.ready;
   }
+
+  console.log(`[DEBUG] handleReady: 플레이어 ${client.sessionId} 준비 상태 변경 - ${oldReadyState} -> ${player.ready}`);
 
   room.broadcast("readyUpdate", {
     playerId: client.sessionId,
@@ -325,7 +360,7 @@ function findCardPosition(
   boardCards: Array<{ row: number; col: number; turnId: number }>,
   boardSize: { rows: number; cols: number },
   currentTurnId: number
-): { success: boolean; position?: { row: number; col: number } } {
+): { success: boolean; position?: { row: number; col: number }; expanded?: boolean } {
   // 가능한 모든 위치를 찾아서 랜덤하게 선택
   const availablePositions: Array<{ row: number; col: number }> = [];
   

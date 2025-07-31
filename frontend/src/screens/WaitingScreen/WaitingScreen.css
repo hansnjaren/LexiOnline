@@ -195,6 +195,110 @@
   color: #999;
 }
 
+/* 라운드 수 안내 텍스트 스타일 */
+.rounds-info {
+  display: flex;
+  align-items: center;
+  padding: 0.8vw 1.2vw;
+  border: 0.12vw solid #dee2e6;
+  border-radius: 0.8vw;
+  min-width: 8vw;
+  box-shadow: 0 0.2vw 0.8vw rgba(0, 0, 0, 0.1);
+}
+
+.rounds-text {
+  font-size: 1.1vw;
+  font-weight: 600;
+  color: #495057;
+  text-align: center;
+  width: 100%;
+}
+
+/* 라디오 버튼 스타일 */
+.easymode-setting {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.2vw;
+  margin-top: 1.2vw;
+}
+
+.easymode-setting label {
+  font-weight: 600;
+  color: #333;
+  font-size: 1.1vw;
+  letter-spacing: 0.05vw;
+}
+
+.radio-group {
+  display: flex;
+  gap: 1.5vw;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5vw;
+  cursor: pointer;
+  padding: 0.5vw 1vw;
+  border-radius: 0.6vw;
+  transition: all 0.3s ease;
+}
+
+.radio-option:hover {
+  background: rgba(102, 126, 234, 0.1);
+  border-color: #667eea;
+  transform: translateY(-0.1vw);
+}
+
+.radio-option input[type="radio"] {
+  display: none;
+}
+
+.radio-custom {
+  width: 1.2vw;
+  height: 1.2vw;
+  border: 0.15vw solid #ccc;
+  border-radius: 50%;
+  position: relative;
+  background: white;
+  transition: all 0.3s ease;
+}
+
+.radio-option input[type="radio"]:checked + .radio-custom {
+  border-color: #667eea;
+  background: #667eea;
+}
+
+.radio-option input[type="radio"]:checked + .radio-custom::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 0.4vw;
+  height: 0.4vw;
+  background: white;
+  border-radius: 50%;
+}
+
+.radio-label {
+  font-size: 0.95vw;
+  font-weight: 500;
+  color: #333;
+  transition: color 0.3s ease;
+}
+
+.radio-option input[type="radio"]:checked ~ .radio-label {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.radio-option input[type="radio"]:checked {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: #667eea;
+}
+
 /* 커스텀 드롭다운 스타일 */
 .custom-dropdown {
   position: relative;
@@ -271,7 +375,7 @@
 }
 
 .dropdown-option {
-  padding: 0.3vw 1.2vw;
+  padding: 0.5vw 1.2vw;
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 0.9vw;
@@ -397,17 +501,7 @@
   .custom-dropdown {
     min-width: 12vw;
   }
-  
-  .dropdown-header {
-    font-size: clamp(1vw, 2.5vw, 1.4vw);
-    padding: 1vw 1.5vw;
-  }
-  
-  .dropdown-option {
-    font-size: clamp(0.9vw, 2.2vw, 1.3vw);
-    padding: 1vw 1.5vw;
-  }
-  
+
   .btn {
     font-size: clamp(1.2vw, 3vw, 1.6vw);
     padding: 1.2vw 2.5vw;
@@ -441,20 +535,11 @@
     min-width: 15vw;
   }
   
-  .dropdown-header {
-    font-size: clamp(1.2vw, 3vw, 1.6vw);
-    padding: 1.2vw 1.8vw;
-  }
-  
-  .dropdown-option {
-    font-size: clamp(1.1vw, 2.8vw, 1.5vw);
-    padding: 1.2vw 1.8vw;
-  }
-  
   .btn {
     font-size: clamp(1.5vw, 4vw, 2vw);
     padding: 1.5vw 3vw;
   }
+
 }
 
 /* 로딩 컨테이너 스타일 */
