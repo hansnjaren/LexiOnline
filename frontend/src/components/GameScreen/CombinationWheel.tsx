@@ -64,7 +64,7 @@ const CombinationWheel: React.FC<CombinationWheelProps> = ({
       // 단계별 애니메이션 실행
       const animateStepByStep = async () => {
         const steps = Math.abs(newIndex - currentIndex);
-        const stepDelay = 150; // 각 단계별 지연 시간 (더 빠르게)
+        const stepDelay = 100; // 각 단계별 지연 시간 (더 빠르게)
         
         if (steps === 1) {
           // 한 칸만 이동하는 경우
@@ -72,32 +72,29 @@ const CombinationWheel: React.FC<CombinationWheelProps> = ({
           setCurrentIndex(newIndex);
           setTimeout(() => setIsAnimating(false), 200);
         } else {
-          // 여러 칸을 이동하는 경우 - 단계별로 실행
+          // 여러 칸을 이동하는 경우 - 단계별로 실행하되 더 빠르게
           const startIndex = currentIndex;
           const stepDirection = direction === 'down' ? 1 : -1;
           
-          // 각 단계를 순차적으로 실행
+          // 각 단계를 순차적으로 실행 (더 빠른 속도로)
           for (let i = 1; i <= steps; i++) {
             const stepIndex = startIndex + (stepDirection * i);
             
-            await new Promise(resolve => {
-              setTimeout(() => {
-                if (swiperRef.current && swiperRef.current.swiper) {
-                  swiperRef.current.swiper.slideTo(stepIndex, 200, false);
-                  setCurrentIndex(stepIndex);
-                }
-                resolve(true);
-              }, (i - 1) * stepDelay);
-            });
+            setTimeout(() => {
+              if (swiperRef.current && swiperRef.current.swiper) {
+                swiperRef.current.swiper.slideTo(stepIndex, 150, false);
+                setCurrentIndex(stepIndex);
+              }
+            }, (i - 1) * stepDelay);
           }
           
           // 최종 위치로 이동하고 애니메이션 완료
           setTimeout(() => {
             if (swiperRef.current && swiperRef.current.swiper) {
-              swiperRef.current.swiper.slideTo(newIndex, 200, false);
+              swiperRef.current.swiper.slideTo(newIndex, 150, false);
               setCurrentIndex(newIndex);
             }
-            setTimeout(() => setIsAnimating(false), 200);
+            setTimeout(() => setIsAnimating(false), 150);
           }, steps * stepDelay);
         }
       };
