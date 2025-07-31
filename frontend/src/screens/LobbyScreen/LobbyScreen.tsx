@@ -46,7 +46,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
       return;
     }
 
-    fetch('/api/userinfo', {
+    fetch('https://api.lexionline.minsung.kr/api/userinfo', {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(async res => {
@@ -72,6 +72,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
         setToken(null);
         localStorage.removeItem('access_token');
         setIsLoading(false);
+        navigate('/');
       });
   }, [token]);
 
