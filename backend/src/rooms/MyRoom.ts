@@ -468,12 +468,19 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       finalHands[sessionId] = Array.from(player.hand);
     });
 
+    const scoreBeforeCalculation = Array.from(this.state.players.entries()).map(([id, p]) => ({
+      playerId: id,
+      score: p.score,
+    }));
+
     const comprehensiveResult = {
       scoreMatrix: calculateRoundScoreMatrix(this.state.players, this.state.maxNumber),
       scores: finalScores,
       finalHands,
       round: this.state.round,
       isGameEnd: this.state.round >= this.state.totalRounds,
+      scoreBeforeCalculation,
+      maxNumber: this.state.maxNumber,
     };
     console.log("2. Created comprehensiveResult:", comprehensiveResult);
 

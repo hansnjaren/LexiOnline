@@ -208,6 +208,8 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
 
   // #region useEffects
   useEffect(() => {
+    console.log("ResultScreen received comprehensiveResult:", comprehensiveResult);
+
     const scores: { [playerId: string]: number } = {};
     if (initialScores) {
       initialScores.forEach(p => {
@@ -218,6 +220,8 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
       setCurrentTransferStep(-1);
       setShowButtons(false);
       setTransferMessage('결과 집계 중...');
+    } else {
+      console.error("initialScores is missing in comprehensiveResult", comprehensiveResult);
     }
 
     if (comprehensiveResult && finalHands && maxNumber && rankedPlayers) {
@@ -289,6 +293,15 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
   }, [scoreMatrix]);
 
   useEffect(() => {
+    console.log("Checking animation readiness:", {
+      isReadyForAnimation,
+      initialScores,
+      comprehensiveResult,
+      finalHands,
+      maxNumber,
+      transfers
+    });
+
     if (!isReadyForAnimation || !initialScores || !comprehensiveResult || !finalHands || !maxNumber) {
       return;
     }
