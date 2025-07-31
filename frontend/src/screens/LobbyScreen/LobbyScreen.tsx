@@ -91,7 +91,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
       console.log('방 생성 성공:', room.sessionId);
       
       // 닉네임 설정 및 중복 체크
-      room.onMessage('nicknameRejected', (message) => {
+      room.onMessage('nicknameRejected', (message: any) => {
         console.error('닉네임 설정 거부:', message.reason);
         showToast(`닉네임 설정 실패: ${message.reason}`, 'error');
         setIsConnecting(false);
@@ -124,7 +124,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
       console.log('방 참가 성공:', room.sessionId);
       
       // 닉네임 설정 및 중복 체크
-      room.onMessage('nicknameRejected', (message) => {
+      room.onMessage('nicknameRejected', (message: any) => {
         console.error('닉네임 설정 거부:', message.reason);
         showToast(`닉네임 설정 실패: 해당 방에 이미 존재하는 닉네임입니다.`, 'error');
         setIsConnecting(false);

@@ -104,7 +104,7 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
     if (!room) {
       console.log('방에 연결되지 않음. 저장된 방 정보로 재연결 시도...');
       setIsReconnecting(true);
-      ColyseusService.reconnectToSavedRoom().then(reconnectedRoom => {
+      ColyseusService.reconnectToSavedRoom().then((reconnectedRoom: any) => {
         setIsReconnecting(false);
         if (reconnectedRoom) {
           console.log('저장된 방에 재연결 성공');

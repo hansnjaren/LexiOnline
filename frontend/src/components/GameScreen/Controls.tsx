@@ -3,6 +3,7 @@ import { Player, GameState } from './types';
 import coinImage from '../../coin.png';
 import cardImage from '../../card.png';
 import { useCardUtils } from './hooks/useCardUtils';
+import CombinationWheel from './CombinationWheel';
 
 interface ControlsProps {
   players: Player[];
@@ -55,7 +56,11 @@ const Controls: React.FC<ControlsProps> = (props) => {
 
         <div className="center-controls">
           <div className="current-combination">
-            <span>현재 조합: {getCurrentCombinationText()}</span>
+            <CombinationWheel
+              currentCombination={getCurrentCombinationText()}
+              lastType={gameState.lastType}
+              lastMadeType={gameState.lastMadeType}
+            />
           </div>
           <div className="control-buttons">
             <button className="control-btn" onClick={handleViewCombinations} disabled={showCardDealAnimation}>족보보기</button>

@@ -61,6 +61,14 @@ function AppContent() {
 
   }, [location.pathname, navigate]);
 
+  useEffect(() => {
+    const unsubscribe = ColyseusService.subscribeScreenChange((screen, data) => {
+      console.log(`Screen change event received: ${screen}`, data);
+      handleScreenChange(screen, data);
+    });
+    return () => unsubscribe();
+  }, []); // Empty dependency array ensures this runs only once
+
   const handleScreenChange = (screen: ScreenType, result?: any) => {
     setCurrentScreen(screen);
     if (screen === 'result') {

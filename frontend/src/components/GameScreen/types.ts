@@ -32,4 +32,7 @@ export interface GameState {
   maxNumber: number;
   round: number;
   totalRounds: number;
+  roundResult?: any;
+  finalResult?: any;
+  startOfRound?: boolean;
 }

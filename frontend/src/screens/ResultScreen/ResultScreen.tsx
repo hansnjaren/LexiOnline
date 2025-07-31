@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './ResultScreen.css';
-import ColyseusService from '../../services/ColyseusService';
+import ColyseusService, { GameStateContainer } from '../../services/ColyseusService';
 
 // #region Interfaces
 interface PlayerScore {
@@ -22,7 +22,7 @@ interface ComprehensiveResult {
 }
 
 interface ResultScreenProps {
-  onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result' | 'finalResult') => void;
+  onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result' | 'finalResult', data?: any) => void;
   playerCount: number;
   roundResult: ComprehensiveResult | null;
 }
@@ -430,9 +430,6 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
                 다음 라운드
               </button>
             )}
-            <button className="btn btn-secondary" onClick={handleBackToLobby}>
-              로비로 돌아가기
-            </button>
           </div>
         )}
       </div>

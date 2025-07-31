@@ -29,7 +29,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
     setDraggedCard, setDealtCards, setVisibleHand,
     
     handleSortByNumber, handleSortByColor, handleDrop, handlePass, handleSubmitCards,
-    handleModeChange, handleCardSelect,
+    handleModeChange, handleCardSelect, handleCardDealComplete,
   } = useGameLogic(onScreenChange);
 
   const handleDragStart = (e: React.DragEvent, cardId: number) => {
@@ -81,9 +81,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
       {showCardDealAnimation && players.length > 0 && (
         <CardDealAnimation
           isVisible={showCardDealAnimation}
-          onComplete={() => {}}
+          onComplete={handleCardDealComplete}
           playerCount={players.length}
-          cardsPerPlayer={16}
+          cardsPerPlayer={myHand.length || 16}
           myPlayerIndex={players.findIndex(p => p.sessionId === mySessionId)}
           myHand={myHand}
           onPlayerCardReceived={handlePlayerCardReceived}
