@@ -56,7 +56,7 @@ const AnimatedNumber: React.FC<{
       const startValue = displayValue;
       const endValue = value;
       const startTime = Date.now();
-      const duration = 2500; // 코인 애니메이션 속도 늦춤 (1.5초 → 2.5초)
+      const duration = 1500; // 애니메이션 속도 높임 (2.5초 → 1.5초)
       
       // 중간 값들을 생성 (빠르게 휘리릭 지나가는 효과)
       const intermediateValues: number[] = [];
@@ -112,7 +112,7 @@ const AnimatedArrow: React.FC<{
     if (visible) {
       setProgress(0);
       const startTime = Date.now();
-      const duration = 2500; // 코인 애니메이션 속도 늦춤 (1.5초 → 2.5초)
+      const duration = 1500; // 애니메이션 속도 높임 (2.5초 → 1.5초)
       
       const animate = () => {
         const elapsed = Date.now() - startTime;
@@ -145,7 +145,7 @@ const AnimatedArrow: React.FC<{
   const arrowHeadY = currentEndY + (ARROW_HEAD_SIZE * 0.4) * Math.sin(angle);
 
   // 코인 숫자의 위치 계산 (화살표를 따라 이동)
-  const coinProgress = Math.min(progress * 1, 1); // 화살표보다 조금 천천히 이동 (0.6 → 0.8)
+  const coinProgress = Math.min(progress * 0.5, 0.5); // 화살표의 절반 정도 위치까지만 이동
   const coinX = startX + (endX - startX) * coinProgress;
   const coinY = startY + (endY - startY) * coinProgress;
 
@@ -167,7 +167,7 @@ const AnimatedArrow: React.FC<{
             top: coinY,
             zIndex: 25,
             transform: 'translate(-50%, -50%)',
-            animation: progress >= 0.8 ? 'coinArrive 1.2s ease-out' : 'coinFloat 3.5s ease-in-out infinite', // 코인 애니메이션 속도 더 늦춤
+            animation: progress >= 0.8 ? 'coinArrive 1.2s ease-out' : 'coinFloat 2.5s ease-in-out infinite', // 코인 애니메이션 속도 조정
             opacity: progress >= 0.8 ? 0.8 : 1
           }}
         >
@@ -465,13 +465,13 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
             [giver.playerId]: { isAnimating: false, direction: 'down' },
             [receiver.playerId]: { isAnimating: false, direction: 'up' }
           }));
-        }, 2500); // 코인 애니메이션 완료 후 상태 초기화 타이밍 늦춤 (1.5초 → 2.5초)
+                 }, 1500); // 애니메이션 완료 후 상태 초기화 타이밍 조정 (2.5초 → 1.5초)
       } else {
         setShowArrow(false);
       }
 
       // Schedule next step
-      animationTimeout = setTimeout(() => runAnimationStep(step + 1), 3500); // 코인 애니메이션 간격 늦춤 (2.5초 → 3.5초)
+             animationTimeout = setTimeout(() => runAnimationStep(step + 1), 2500); // 애니메이션 간격 조정 (3.5초 → 2.5초)
     };
 
     // Start the animation
