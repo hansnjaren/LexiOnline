@@ -607,3 +607,45 @@
   pointer-events: none;
   z-index: 20;
 }
+
+/* 코인 금액 애니메이션 스타일 */
+.coin-amount {
+  background: linear-gradient(145deg, #ffd700 0%, #ffed4e 100%);
+  color: #333;
+  font-weight: bold;
+  font-size: 2.2vh;
+  padding: 1vh 1.5vw;
+  border-radius: 2.5vh;
+  border: 0.3vh solid #ffb700;
+  box-shadow: 
+    0 0.6vh 1.8vh rgba(255, 215, 0, 0.5),
+    0 0 0 0.1vh rgba(255, 255, 255, 0.4) inset,
+    0 0 0 0.2vh rgba(0, 0, 0, 0.1) inset;
+  backdrop-filter: blur(0.5vh);
+  text-shadow: 0 0.1vh 0.2vh rgba(0, 0, 0, 0.3);
+  min-width: 3.5vw;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@keyframes coinFloat {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 0.9;
+  }
+}
+
+@keyframes coinArrive {
+  0% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.8;
+  }
+}
