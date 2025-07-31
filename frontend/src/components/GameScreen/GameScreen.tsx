@@ -12,6 +12,7 @@ import GameGuide from './GameGuide';
 import CardDealAnimation from './CardDealAnimation';
 import CombinationWheel from './CombinationWheel';
 import ColyseusService from '../../services/ColyseusService';
+import Toast from '../Toast/Toast';
 
 interface GameScreenProps {
   onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result' | 'finalResult', result?: any) => void;
@@ -118,6 +119,17 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   const [waitingForNextRound, setWaitingForNextRound] = useState(false);
   const [readyPlayers, setReadyPlayers] = useState<Set<string>>(new Set());
   const [showBoardMask, setShowBoardMask] = useState(false);
+  
+  // Toast 상태
+  const [toast, setToast] = useState<{
+    message: string;
+    type: 'success' | 'error' | 'info';
+    isVisible: boolean;
+  }>({
+    message: '',
+    type: 'info',
+    isVisible: false
+  });
   
   // 모드 변경 중 상태 (정렬 순서 보호용) - useRef 사용하여 즉시 반영
   const isModeChangingRef = useRef(false);
@@ -436,7 +448,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         setBoardCards(prev => [...prev, ...submittedCards]);
       } else {
         console.error('[ERROR] 백엔드에서 position 정보가 전송되지 않았습니다.');
-        alert('게임 보드 동기화 오류가 발생했습니다.');
+        showToast('게임 보드 동기화 오류가 발생했습니다.', 'error');
       }
       
       if (message.playerId === room.sessionId) {
@@ -549,24 +561,24 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
 
     room.onMessage('submitRejected', (message) => {
       console.log('카드 제출 거부:', message);
-      alert('카드 제출이 거부되었습니다: ' + message.reason);
+      showToast('카드 제출이 거부되었습니다: ' + message.reason, 'error');
       setIsSubmitting(false);
     });
 
     room.onMessage('noCard', (message) => {
       console.log('카드 없음 오류:', message);
-      alert('보유하지 않은 카드를 제출하려고 했습니다: ' + message.reason);
+      showToast('보유하지 않은 카드를 제출하려고 했습니다: ' + message.reason, 'error');
       setIsSubmitting(false);
     });
 
     room.onMessage('passRejected', (message) => {
       console.log('패스 거부:', message);
-      alert('패스가 거부되었습니다: ' + message.reason);
+      showToast('패스가 거부되었습니다: ' + message.reason, 'error');
     });
 
     room.onMessage('invalidPlayer', (message) => {
       console.log('플레이어 정보 오류:', message);
-      alert('플레이어 정보가 유효하지 않습니다: ' + message.reason);
+      showToast('플레이어 정보가 유효하지 않습니다: ' + message.reason, 'error');
     });
 
     room.onMessage('gameStarted', (message) => {
@@ -872,7 +884,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   // 카드 제출 가능 여부를 확인하는 함수 (백엔드 로직 기반으로 재작성)
   const canSubmitCards = (cardNumbers: number[]): { canSubmit: boolean; reason: string } => {
     if (cardNumbers.length === 0) {
-      return { canSubmit: false, reason: "카드를 선택해주세요" };
+      return { canSubmit: false, reason: "카드를 선택해주세요." };
     }
 
     const room = ColyseusService.getRoom();
@@ -892,7 +904,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         const madeResult = evaluateMade(cardNumbers, maxNumber);
         evaluationResult = { type: 5, value: madeResult.value, valid: madeResult.valid, madeType: madeResult.type };
     } else {
-        return { canSubmit: false, reason: `잘못된 카드 개수입니다: ${cardNumbers.length}장` };
+        return { canSubmit: false, reason: `잘못된 카드 개수입니다.` };
     }
 
     if (!evaluationResult.valid) {
@@ -917,7 +929,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
             if (currentMadeType === lastMadeType && currentValue > lastHighestValue) {
                 return { canSubmit: true, reason: "같은 족보, 더 높은 값" };
             }
-            return { canSubmit: false, reason: `더 낮은 족보 또는 값. 현재: ${getLastMadeTypeText(currentMadeType)}(${currentValue}), 이전: ${getLastMadeTypeText(lastMadeType)}(${lastHighestValue})` };
+            return { canSubmit: false, reason: `더 낮은 족보 또는 값입니다.` };
         }
         // 이전이 '심플 콤보'였을 경우, '메이드'가 항상 이김
         return { canSubmit: true, reason: "메이드가 이전 조합보다 높음" };
@@ -926,18 +938,18 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     // 경우 2: 현재 제출이 '심플 콤보' (1~3장)
     if (currentType >= 1 && currentType <= 3) {
         if (lastType === 5) { // 이전이 '메이드'였을 경우
-            return { canSubmit: false, reason: "메이드 다음에는 더 높은 메이드만 낼 수 있습니다." };
+            return { canSubmit: false, reason: "더 높은 조합의 패만 낼 수 있습니다." };
         }
         if (currentType !== lastType) {
-            return { canSubmit: false, reason: `이전과 같은 개수의 카드를 내야 합니다. (이전: ${lastType}장, 현재: ${currentType}장)` };
+            return { canSubmit: false, reason: `이전과 같은 ${lastType}장의 카드를 내야 합니다.` };
         }
         if (currentValue > lastHighestValue) {
             return { canSubmit: true, reason: "더 높은 값" };
         }
-        return { canSubmit: false, reason: `더 낮은 값. 현재: ${currentValue}, 이전: ${lastHighestValue}` };
+        return { canSubmit: false, reason: `이전보다 높은 값을 내야 합니다.` };
     }
 
-    return { canSubmit: false, reason: "알 수 없는 오류" };
+    return { canSubmit: false, reason: "알 수 없는 오류가 발생했습니다." };
   };
 
   // 디버깅용: 카드 정보 출력 함수
@@ -954,6 +966,20 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     const simpleComboValue = getSimpleComboValue(cardNumber);
     
     return `카드${cardNumber}: 색상=${color}, 숫자=${value}, type=${type}, number=${number}, orderIndex=${orderIndex}, 올바른순서값=${orderValue}, 실제순서값=${simpleComboValue}`;
+  };
+
+  // Toast 표시 함수
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({
+      message,
+      type,
+      isVisible: true
+    });
+  };
+
+  // Toast 닫기 함수
+  const closeToast = () => {
+    setToast(prev => ({ ...prev, isVisible: false }));
   };
 
   // 백엔드 상태로부터 모든 플레이어의 남은 카드 수 동기화
@@ -1461,7 +1487,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     }
     
     if (selectedCards.length === 0) {
-      alert('제출할 카드를 선택해주세요.');
+      showToast('제출할 카드를 선택해주세요.', 'error');
       return;
     }
     
@@ -1529,7 +1555,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       console.log(`[DEBUG] 제출 검증: ${validation.reason}`);
       
       if (!validation.canSubmit) {
-        alert(`제출 불가: ${validation.reason}`);
+        showToast(`제출 불가: ${validation.reason}`, 'error');
         setIsSubmitting(false);
         return;
       }
@@ -1946,6 +1972,17 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       <GameGuide 
         isOpen={showGameGuide}
         onClose={() => setShowGameGuide(false)}
+      />
+      
+      {/* Toast 알림 */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={closeToast}
+        duration={2000}
+        showCloseButton={false}
+        className="game-toast"
       />
     </div>
   );

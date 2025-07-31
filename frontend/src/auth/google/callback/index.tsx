@@ -1,11 +1,34 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { JSX } from 'react';
 import '../../../screens/LobbyScreen/LobbyScreen.css';
+import '../../../components/Toast/Toast.css';
+import Toast from '../../../components/Toast/Toast';
 
 export default function GoogleOAuthCallback(): JSX.Element {
   const navigate = useNavigate();
   const effectRan = useRef(false);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: 'success' | 'error' | 'info';
+    isVisible: boolean;
+  }>({
+    message: '',
+    type: 'info',
+    isVisible: false,
+  });
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'error') => {
+    setToast({
+      message,
+      type,
+      isVisible: true,
+    });
+  };
+
+  const closeToast = () => {
+    setToast(prev => ({ ...prev, isVisible: false }));
+  };
 
   useEffect(() => {
     // StrictMode에서 두 번 실행되는 것을 방지
@@ -34,7 +57,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
 
     if (returnedState !== savedState) {
       console.warn('[OAuthCallback] state 불일치, 잘못된 접근');
-      alert('잘못된 접근입니다');
+      showToast('잘못된 접근입니다', 'error');
 
       // 해시는 여기서도 제거해줍니다.
       window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
@@ -73,7 +96,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
         })
         .catch((err) => {
           console.error('서버 로그인 실패:', err);
-          alert('로그인에 실패했습니다.');
+          showToast('로그인에 실패했습니다.', 'error');
           // 해시 제거는 오류 시에도 단 한 번만
           window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
           console.log('[OAuthCallback] URL 해시 제거 완료');
@@ -81,7 +104,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
         });
     } else {
       console.error('[OAuthCallback] id_token이 없음');
-      alert('로그인에 실패했습니다.');
+      showToast('로그인에 실패했습니다.', 'error');
       // 해시 제거도 단 한 번만
       window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
       console.log('[OAuthCallback] URL 해시 제거 완료');
@@ -104,6 +127,12 @@ export default function GoogleOAuthCallback(): JSX.Element {
           인증 처리 중...
         </p>
       </div>
+      <Toast 
+        message={toast.message} 
+        type={toast.type} 
+        isVisible={toast.isVisible} 
+        onClose={closeToast} 
+      />
     </div>
   );
 }
