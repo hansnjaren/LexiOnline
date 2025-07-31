@@ -1607,6 +1607,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   };
 
   const handleSortByNumber = () => {
+    // 이미 정렬 중이면 중복 실행 방지
+    if (isSorting) {
+      return;
+    }
+    
     setIsSorting(true);
     
     const sorted = [...sortedHand].sort((a, b) => a.value - b.value);
@@ -1640,6 +1645,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
   };
 
   const handleSortByColor = () => {
+    // 이미 정렬 중이면 중복 실행 방지
+    if (isSorting) {
+      return;
+    }
+    
     setIsSorting(true);
     
     const colorOrder = gameMode === 'easyMode'

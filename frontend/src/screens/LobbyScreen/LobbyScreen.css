@@ -184,6 +184,7 @@
   color: #cccccc;
   margin-bottom: 2vw;
   line-height: 1.5;
+  font-size: 1vw;
 }
 
 .btn-google {
@@ -589,13 +590,13 @@
     justify-content: center;
   }
   
-  .features-grid {
-    grid-template-columns: 1fr;
-  }
-  
   .btn-large {
     padding: 1.2vw 2.5vw;
     font-size: 1vw;
+  }
+  
+  .login-card p {
+    font-size: 1.2vw;
   }
 }
 
@@ -610,5 +611,9 @@
   
   .feature-card {
     padding: 1.5vw;
+  }
+  
+  .login-card p {
+    font-size: 1.4vw;
   }
 } 
