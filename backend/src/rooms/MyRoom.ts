@@ -53,6 +53,15 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     this.onMessage("easyMode", (client, data) => handleEasyMode(this, client, data));
     this.onMessage("sortOrder", (client, data) => handleSortOrder(this, client, data));
     
+    this.onMessage("toggleBlindMode", (client, data) => {
+      if (client.sessionId !== this.state.host) {
+        client.send("changeRejected", { reason: "Only the host can change blind mode." });
+        return;
+      }
+      this.state.blindMode = data.blindMode;
+      this.broadcast("blindModeChanged", { blindMode: this.state.blindMode });
+    });
+
     this.onMessage("setNickname", (client, data) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || !data.nickname) {
@@ -381,6 +390,7 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     this.state.lastCards = new ArraySchema<number>();
     this.state.lastPlayerIndex = -1;
     this.state.currentTurnId = 0;
+    this.state.maskTurnId = -1;
 
     for (const sessionId of this.state.playerOrder) {
       const player = this.state.players.get(sessionId);
@@ -422,6 +432,9 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       }
       
       this.broadcast("passReset", {});
+      if (this.state.blindMode) {
+        this.state.maskTurnId = this.state.currentTurnId;
+      }
       this.broadcast("cycleEnded", {});
     }
     
@@ -438,7 +451,10 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
   }
 
   async endRound() {
+    console.log("--- Starting endRound function ---");
     const scoreDiffMap = calculateRoundScores(this.state.players, this.state.maxNumber);
+    console.log("1. Calculated scoreDiffMap:", scoreDiffMap);
+
     const finalScores = Array.from(this.state.players.entries()).map(([id, p]) => ({
       playerId: id,
       score: p.hand ? p.hand.length : 0,
@@ -459,6 +475,7 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
       round: this.state.round,
       isGameEnd: this.state.round >= this.state.totalRounds,
     };
+    console.log("2. Created comprehensiveResult:", comprehensiveResult);
 
     for (const [sessionId, diffScore] of scoreDiffMap.entries()) {
       const player = this.state.players.get(sessionId);
@@ -468,8 +485,10 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     for (const player of this.state.players.values()) {
       player.readyForNextRound = false;
     }
+    console.log("3. Updated player scores and ready status.");
 
     this.broadcast("roundEnded", comprehensiveResult);
+    console.log("4. Broadcasted 'roundEnded'.");
 
     if (comprehensiveResult.isGameEnd) {
       this.endGame().catch(e => console.error("[ERROR] endGame 실행 중 오류 발생:", e));
@@ -480,6 +499,9 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
   }
 
   async endGame() {
+    console.log("--- Starting endGame function ---");
+    console.log(`Current NODE_ENV: '${process.env.NODE_ENV}'`);
+
     const finalScores = Array.from(this.state.players.entries()).map(([sessionId, player]) => ({
       playerId: sessionId,
       userId: player.userId,
@@ -494,43 +516,50 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
 
     const dbSaveResults = [];
 
-    for (const playerData of finalScoresWithRating) {
-      const { userId, score, rank, rating_mu_before, rating_sigma_before, rating_mu_after, rating_sigma_after } = playerData;
-      
-      if (!userId) {
-        dbSaveResults.push({ userId: null, success: false, reason: 'Not a logged-in user' });
-        continue;
+    if (process.env.NODE_ENV === 'production') {
+      for (const playerData of finalScoresWithRating) {
+        const { userId, score, rank, rating_mu_before, rating_sigma_before, rating_mu_after, rating_sigma_after } = playerData;
+        
+        if (!userId) {
+          dbSaveResults.push({ userId: null, success: false, reason: 'Not a logged-in user' });
+          continue;
+        }
+
+        try {
+          await prisma.$transaction(async (tx) => {
+            await tx.gameHistory.create({
+              data: {
+                userId,
+                playerCount: finalScores.length,
+                rank,
+                score,
+                scoresAll: finalScores.map(f => f.score),
+                rating_mu_before,
+                rating_sigma_before,
+                rating_mu_after,
+                rating_sigma_after,
+                gameId: this.roomId,
+              },
+            });
+
+            await tx.user.update({
+              where: { id: userId },
+              data: {
+                rating_mu: rating_mu_after,
+                rating_sigma: rating_sigma_after,
+              },
+            });
+          });
+          dbSaveResults.push({ userId, success: true });
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : 'An unknown error occurred';
+          dbSaveResults.push({ userId, success: false, reason });
+        }
       }
-
-      try {
-        await prisma.$transaction(async (tx) => {
-          await tx.gameHistory.create({
-            data: {
-              userId,
-              playerCount: finalScores.length,
-              rank,
-              score,
-              scoresAll: finalScores.map(f => f.score),
-              rating_mu_before,
-              rating_sigma_before,
-              rating_mu_after,
-              rating_sigma_after,
-              gameId: this.roomId,
-            },
-          });
-
-          await tx.user.update({
-            where: { id: userId },
-            data: {
-              rating_mu: rating_mu_after,
-              rating_sigma: rating_sigma_after,
-            },
-          });
-        });
-        dbSaveResults.push({ userId, success: true });
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : 'An unknown error occurred';
-        dbSaveResults.push({ userId, success: false, reason });
+    } else {
+      console.log("[DEV MODE] Skipping database save.");
+      for (const playerData of finalScoresWithRating) {
+        dbSaveResults.push({ userId: playerData.userId, success: true, reason: 'DEV mode' });
       }
     }
 
