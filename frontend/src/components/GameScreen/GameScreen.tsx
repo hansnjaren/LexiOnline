@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import './GameScreen.css';
+import '../Toast/Toast.css';
 import CombinationGuide from './CombinationGuide';
 import GameGuide from './GameGuide';
 import CardDealAnimation from './CardDealAnimation';
@@ -25,7 +26,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange }) => {
     players, mySessionId, myHand, sortedHand, visibleHand, gameState, gameMode,
     selectedCards, boardCards, boardSize, showCardDealAnimation, dealtCards,
     isGameStarted, waitingForNextRound, readyPlayers, showBoardMask, isSubmitting,
-    draggedCard, isSorting, cardOffsets, handRef, isMyTurn,
+    draggedCard, isSorting, cardOffsets, handRef, isMyTurn, toast, showToast, closeToast,
     
     setDraggedCard, setDealtCards, setVisibleHand,
     

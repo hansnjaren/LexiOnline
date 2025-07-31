@@ -273,7 +273,7 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
       
       // 호스트 변경 확인만 수행
       if (message.isHost) {
-        setIsHost(message.playerId === room.sessionId);
+        setHostId(message.playerId);
       }
     });
 

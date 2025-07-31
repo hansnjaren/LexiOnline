@@ -36,6 +36,29 @@ export const useGameLogic = (onScreenChange: (screen: ScreenType, data?: any) =>
   const [showBoardMask, setShowBoardMask] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Toast state
+  const [toast, setToast] = useState<{
+    message: string;
+    type: 'success' | 'error' | 'info';
+    isVisible: boolean;
+  }>({
+    message: '',
+    type: 'info',
+    isVisible: false,
+  });
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'error') => {
+    setToast({
+      message,
+      type,
+      isVisible: true,
+    });
+  };
+
+  const closeToast = () => {
+    setToast(prev => ({ ...prev, isVisible: false }));
+  };
+
   // Drag & Drop states
   const [draggedCard, setDraggedCard] = useState<number | null>(null);
   const [isSorting, setIsSorting] = useState(false);
@@ -159,7 +182,7 @@ export const useGameLogic = (onScreenChange: (screen: ScreenType, data?: any) =>
 
     const validation = canSubmitCards(cardNumbers);
     if (!validation.canSubmit) {
-      alert(`제출 불가: ${validation.reason}`);
+      showToast(`제출 불가: ${validation.reason}`, 'error');
       return;
     }
     
@@ -189,6 +212,7 @@ export const useGameLogic = (onScreenChange: (screen: ScreenType, data?: any) =>
     selectedCards, boardCards, boardSize,
     isGameStarted, waitingForNextRound, readyPlayers, showBoardMask, isSubmitting,
     draggedCard, isSorting, cardOffsets, handRef, isMyTurn, showCardDealAnimation, dealtCards,
+    toast, showToast, closeToast,
     
     setDraggedCard, setDealtCards, setVisibleHand,
     
