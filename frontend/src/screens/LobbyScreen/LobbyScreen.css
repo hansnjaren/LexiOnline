@@ -580,12 +580,6 @@
     gap: 1.2vw;
   }
   
-  .user-section {
-    flex-direction: column;
-    gap: 1.2vw;
-    margin-right:5vw;
-    margin-top:0.5vh;
-  }
   .tab-button {
     justify-content: center;
   }
