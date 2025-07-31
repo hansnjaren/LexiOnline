@@ -157,6 +157,12 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
       // 호스트 확인
       setIsHost(state.host === room.sessionId);
       console.log('호스트 여부:', state.host === room.sessionId);
+      
+      // 라운드 수 설정
+      if (state.totalRounds !== undefined) {
+        setRounds(state.totalRounds);
+        console.log('초기 라운드 수 설정:', state.totalRounds);
+      }
     };
 
     // 초기 상태 로드
@@ -189,6 +195,12 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
         
         // 호스트 확인
         setIsHost(state.host === room.sessionId);
+        
+        // 라운드 수 업데이트
+        if (state.totalRounds !== undefined) {
+          setRounds(state.totalRounds);
+          console.log('라운드 수 업데이트:', state.totalRounds);
+        }
         
         // 본인이 그룹에 포함되어 있는지 확인
         const isInGroup = state.players.has(room.sessionId);
