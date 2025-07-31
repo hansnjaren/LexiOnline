@@ -21,14 +21,8 @@ export function parseCard(card: number, maxNumber: number) {
   return { type, number };
 }
 
-export function getOrderIndex(n: number, maxNumber: number): number {
-  if (n === 0) return maxNumber - 2;
-  if (n === 1) return maxNumber - 1;
-  return n - 2;
-}
-
 export function getValue(number: number, type: number, maxNumber: number): number {
-  return getOrderIndex(number, maxNumber) * maxNumber + type;
+  return number * maxNumber + type;
 }
 
 export function isStraightWithException(numbers: number[], maxNumber: number): boolean {
@@ -85,7 +79,7 @@ export function evaluateMade(cards: number[], maxNumber: number): MadeEvalResult
   if (cards.length !== 5) return { type: MADE_NONE, value: 0, valid: false };
 
   const parsed = cards.map(card => parseCard(card, maxNumber));
-  const numbers = parsed.map(c => c.number).sort((a, b) => a - b);
+  const numbers = parsed.map(c => c.number);
   const types = parsed.map(c => c.type);
 
   const numCount = new Map<number, number>();
@@ -94,7 +88,7 @@ export function evaluateMade(cards: number[], maxNumber: number): MadeEvalResult
   types.forEach(t => typeCount.set(t, (typeCount.get(t) || 0) + 1));
 
   const isFlush = typeCount.size === 1;
-  const isStraight = isStraightWithException(numbers, maxNumber);
+  const isStraight = isStraightWithException(numbers.slice().sort((a, b) => a - b), maxNumber);
 
   let four = false, three = false, two = false;
   for (const count of numCount.values()) {
@@ -108,36 +102,29 @@ export function evaluateMade(cards: number[], maxNumber: number): MadeEvalResult
   console.log(`[DEBUG] 색상 분포:`, Array.from(typeCount.entries()));
   console.log(`[DEBUG] three=${three}, two=${two}, four=${four}`);
 
-  let bestIndex = -1, bestType = -1, bestNumber = -1;
-  for (let i = 0; i < numbers.length; i++) {
-    const idx = getOrderIndex(numbers[i], maxNumber);
-    if (idx > bestIndex || (idx === bestIndex && types[i] > bestType)) {
-      bestIndex = idx;
-      bestType = types[i];
-      bestNumber = numbers[i];
-    }
-  }
-
   if (isFlush && isStraight) {
-    return { type: MADE_STRAIGHTFLUSH, value: getValue(bestNumber, bestType, maxNumber), valid: true };
+    const bestValue = Math.max(...parsed.map(p => getValue(p.number, p.type, maxNumber)));
+    return { type: MADE_STRAIGHTFLUSH, value: bestValue, valid: true };
   }
   if (four) {
-    let fourNumber = [...numCount.entries()].find(([n, c]) => c === 4)![0];
-    let maxType = -1;
-    for (let i = 0; i < numbers.length; i++) if (numbers[i] === fourNumber && types[i] > maxType) maxType = types[i];
-    return { type: MADE_FOURCARDS, value: getValue(fourNumber, maxType, maxNumber), valid: true };
+    const fourNumber = [...numCount.entries()].find(([, count]) => count === 4)![0];
+    const fourCards = parsed.filter(p => p.number === fourNumber);
+    const bestType = Math.max(...fourCards.map(c => c.type));
+    return { type: MADE_FOURCARDS, value: getValue(fourNumber, bestType, maxNumber), valid: true };
   }
   if (three && two) {
-    let threeNumber = [...numCount.entries()].find(([n, c]) => c === 3)![0];
-    let maxType = -1;
-    for (let i = 0; i < numbers.length; i++) if (numbers[i] === threeNumber && types[i] > maxType) maxType = types[i];
-    return { type: MADE_FULLHOUSE, value: getValue(threeNumber, maxType, maxNumber), valid: true };
+    const threeNumber = [...numCount.entries()].find(([, count]) => count === 3)![0];
+    const threeCards = parsed.filter(p => p.number === threeNumber);
+    const bestType = Math.max(...threeCards.map(c => c.type));
+    return { type: MADE_FULLHOUSE, value: getValue(threeNumber, bestType, maxNumber), valid: true };
   }
   if (isFlush) {
-    return { type: MADE_FLUSH, value: getValue(bestNumber, bestType, maxNumber), valid: true };
+    const bestValue = Math.max(...parsed.map(p => getValue(p.number, p.type, maxNumber)));
+    return { type: MADE_FLUSH, value: bestValue, valid: true };
   }
   if (isStraight) {
-    return { type: MADE_STRAIGHT, value: getValue(bestNumber, bestType, maxNumber), valid: true };
+    const bestValue = Math.max(...parsed.map(p => getValue(p.number, p.type, maxNumber)));
+    return { type: MADE_STRAIGHT, value: bestValue, valid: true };
   }
   return { type: MADE_NONE, value: 0, valid: false };
 }

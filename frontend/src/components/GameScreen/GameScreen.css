@@ -1274,3 +1274,17 @@
   color: #ccc;
   box-shadow: 0 0.2vh 0.5vh rgba(108, 117, 125, 0.3);
 }
+
+.my-hand.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+}
+
+.loading-text {
+  color: #333;
+  font-size: 1.2vw;
+  font-weight: bold;
+}

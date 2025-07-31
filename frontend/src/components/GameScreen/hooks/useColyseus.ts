@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import ColyseusService from '../../../services/ColyseusService';
-import { Player, Card } from './useGameLogic';
+import { Player, Card } from '../types';
 
 interface ColyseusProps {
   onScreenChange: (screen: 'lobby' | 'waiting' | 'game' | 'result' | 'finalResult', result?: any) => void;

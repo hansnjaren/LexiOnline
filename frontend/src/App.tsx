@@ -95,7 +95,7 @@ function AppContent() {
       case 'waiting':
         return <WaitingScreen onScreenChange={handleScreenChange} playerCount={playerCount} setPlayerCount={setPlayerCount} />;
       case 'game':
-        return <GameScreen onScreenChange={handleScreenChange} playerCount={playerCount} />;
+        return <GameScreen onScreenChange={handleScreenChange} />;
       case 'result':
         return <ResultScreen onScreenChange={handleScreenChange} playerCount={playerCount} roundResult={roundResult} />;
       case 'finalResult':
