@@ -404,6 +404,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       
       const submittedMaxNumber = room?.state?.maxNumber ?? gameState.maxNumber;
       
+      // 서버로부터 받은 보드 크기 정보 동기화
+      if (message.boardSize) {
+        console.log(`[DEBUG] 서버에서 받은 보드 크기: ${message.boardSize.rows}x${message.boardSize.cols}`);
+        setBoardSize({ rows: message.boardSize.rows, cols: message.boardSize.cols });
+      }
+      
       if (message.position) {
         const submittedCards = message.cards.map((cardNumber: number, index: number) => {
           const color = getCardColorFromNumber(cardNumber, submittedMaxNumber);
@@ -1113,7 +1119,15 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       setBoardCards(prev => [...prev, ...newCards]);
       setPendingCards([]); // 대기 중인 패 제거
     } else {
-      // 25x6에서도 실패한 경우, 여백 압축 시도
+      // 보드 확장 시도 (15x4 → 20x5 → 25x6 순서)
+      const expanded = expandBoard();
+      if (expanded) {
+        console.log('submitPendingCards: 보드 확장 성공, 확장 후 다시 시도');
+        // 확장 후 즉시 다시 시도 (useEffect에서 처리됨)
+        return;
+      }
+      
+      // 모든 확장이 완료된 후에만 여백 압축 시도
       const compressAndPlace = () => {
         console.log('submitPendingCards compressAndPlace 시작, newCards 길이:', newCards.length);
         
@@ -1191,15 +1205,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         console.log('submitPendingCards: 압축 성공');
         setPendingCards([]); // 대기 중인 패 제거
       } else {
-        console.log('submitPendingCards: 압축 실패');
-        // 압축해도 실패하면 25x6으로 확장 시도
-        if (boardSize.rows === 5 && boardSize.cols === 20) {
-          console.log('submitPendingCards: 25x6으로 확장 시도');
-          setBoardSize({ rows: 6, cols: 25 });
-          // 확장 후 즉시 다시 시도 (useEffect에서 처리됨)
-        } else {
-          console.log('submitPendingCards: 확장 조건 불만족, 현재 보드 크기:', boardSize);
-        }
+        console.log('submitPendingCards: 모든 방법 실패, 현재 보드 크기:', boardSize);
       }
     }
   };

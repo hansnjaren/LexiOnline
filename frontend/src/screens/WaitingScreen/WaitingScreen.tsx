@@ -222,16 +222,20 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
     room.onMessage('readyUpdate', (message: any) => {
       console.log('준비 상태 업데이트:', message);
       // 준비 상태 업데이트 시 플레이어 목록도 업데이트
-      setPlayers(prevPlayers => 
-        prevPlayers.map(player => 
+      setPlayers(prevPlayers => {
+        const updatedPlayers = prevPlayers.map(player => 
           player.id === message.playerId 
             ? { ...player, isReady: message.ready }
             : player
-        )
-      );
+        );
+        console.log(`[DEBUG] readyUpdate: 플레이어 목록 업데이트 - ${message.playerId} 준비 상태: ${message.ready}`);
+        console.log(`[DEBUG] readyUpdate: 업데이트된 플레이어 목록:`, updatedPlayers);
+        return updatedPlayers;
+      });
       
       // 자신의 준비 상태도 업데이트
       if (message.playerId === room.sessionId) {
+        console.log(`[DEBUG] readyUpdate: 자신의 준비 상태 업데이트 - ${message.ready}`);
         setIsReady(message.ready);
       }
     });
@@ -278,25 +282,10 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
 
     room.onMessage('playerJoined', (message: any) => {
       console.log('새 플레이어 입장:', message);
-      // 새 플레이어 추가 (중복 체크)
-      setPlayers(prevPlayers => {
-        const existingPlayer = prevPlayers.find(p => p.id === message.playerId);
-        if (existingPlayer) {
-          console.log('이미 존재하는 플레이어입니다:', message.playerId);
-          return prevPlayers;
-        }
-        return [
-          ...prevPlayers,
-          {
-            id: message.playerId,
-            nickname: message.nickname,
-            isReady: false,
-            easyMode: false, // 기본값
-          }
-        ];
-      });
+      // playerJoined에서는 새 플레이어를 추가하지 않음
+      // playersUpdated 메시지에서 전체 플레이어 목록을 동기화함
       
-      // 호스트 변경 확인
+      // 호스트 변경 확인만 수행
       if (message.isHost) {
         setIsHost(message.playerId === room.sessionId);
       }
@@ -317,40 +306,37 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
 
     room.onMessage('playerLeft', (message: any) => {
       console.log('플레이어 퇴장:', message);
-      // 퇴장한 플레이어 제거
-      setPlayers(prevPlayers => 
-        prevPlayers.filter(player => player.id !== message.playerId)
-      );
+      // playerLeft에서는 플레이어를 제거하지 않음
+      // playersUpdated 메시지에서 전체 플레이어 목록을 동기화함
       
       // 호스트 변경 확인
       if (message.newHost) {
         setIsHost(message.newHost === room.sessionId);
       }
-      
-      // 본인이 퇴장당했는지 확인
-      if (message.playerId === room.sessionId) {
-        console.log('본인이 그룹에서 퇴장당했습니다. 로비로 이동합니다.');
-        ColyseusService.disconnect();
-        navigate('/');
-        onScreenChange('lobby');
-      }
     });
 
     room.onMessage('playersUpdated', (message: any) => {
       console.log('플레이어 목록 업데이트:', message);
+      console.log(`[DEBUG] playersUpdated: 받은 플레이어 목록:`, message.players);
+      
       // 전체 플레이어 목록을 서버에서 받은 정보로 업데이트
       const updatedPlayers: Player[] = message.players.map((p: any) => ({
         id: p.playerId,
         nickname: p.nickname,
-        isReady: p.isReady,
+        isReady: p.isReady, // 서버에서 받은 준비 상태 그대로 사용
         easyMode: p.easyMode || false,
       }));
+      
+      console.log(`[DEBUG] playersUpdated: 업데이트된 플레이어 목록:`, updatedPlayers);
       setPlayers(updatedPlayers);
       
       // 호스트 정보도 업데이트
       const currentPlayer = message.players.find((p: any) => p.playerId === room.sessionId);
       if (currentPlayer) {
         setIsHost(currentPlayer.isHost);
+        // 자신의 준비 상태도 서버 상태와 동기화
+        console.log(`[DEBUG] playersUpdated: 자신의 준비 상태 동기화 - ${currentPlayer.isReady}`);
+        setIsReady(currentPlayer.isReady);
       }
     });
 

@@ -310,13 +310,18 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
 
     // 대기화면 멤버 목록 동기화
     // 모든 클라이언트에게 업데이트된 플레이어 목록 전송
+    // 기존 플레이어들의 준비 상태를 유지하면서 전송
+    const playersList = Array.from(this.state.players.entries()).map(([id, p]) => ({
+      playerId: id,
+      nickname: p.nickname || '익명',
+      isReady: p.ready, // 기존 준비 상태 유지
+      isHost: this.state.host === id
+    }));
+    
+    console.log(`[DEBUG] onJoin: playersUpdated 전송 - 플레이어 목록:`, playersList);
+    
     this.broadcast("playersUpdated", {
-      players: Array.from(this.state.players.entries()).map(([id, p]) => ({
-        playerId: id,
-        nickname: p.nickname || '익명',
-        isReady: p.ready || false,
-        isHost: this.state.host === id
-      }))
+      players: playersList
     });
 
     console.log(`플레이어 ${client.sessionId} 입장. 현재 플레이어 수: ${this.state.players.size}`);
@@ -342,13 +347,18 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     });
 
     // 모든 클라이언트에게 업데이트된 플레이어 목록 전송
+    // 기존 플레이어들의 준비 상태를 유지하면서 전송
+    const playersList = Array.from(this.state.players.entries()).map(([id, p]) => ({
+      playerId: id,
+      nickname: p.nickname || '익명',
+      isReady: p.ready, // 기존 준비 상태 유지
+      isHost: this.state.host === id
+    }));
+    
+    console.log(`[DEBUG] onLeave: playersUpdated 전송 - 플레이어 목록:`, playersList);
+    
     this.broadcast("playersUpdated", {
-      players: Array.from(this.state.players.entries()).map(([id, p]) => ({
-        playerId: id,
-        nickname: p.nickname || '익명',
-        isReady: p.ready || false,
-        isHost: this.state.host === id
-      }))
+      players: playersList
     });
 
     console.log(`플레이어 ${client.sessionId} 퇴장. 현재 플레이어 수: ${this.state.players.size}`);
