@@ -366,6 +366,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     room.onMessage('roundStart', (message) => {
       console.log('라운드 시작:', message);
       
+      // 새 라운드 시작 시 보드 상태 초기화 (15X4로 리셋)
+      setBoardCards([]);
+      setBoardSize({ rows: 4, cols: 15 });
+      setPendingCards([]);
+      console.log('새 라운드 시작 - 보드 크기 리셋: 4x15');
+      
       if (message.hand) {
         const maxNumber = message.maxNumber || 13;
         const handCards = message.hand.map((cardNumber: number, index: number) => {
