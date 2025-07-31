@@ -574,12 +574,6 @@
     margin: 0.8vw;
   }
   
-  .header-section {
-    flex-direction: column;
-    gap: 1.5vw;
-    text-align: center;
-  }
-  
   .logo-section {
     flex-direction: column;
     gap: 1.2vw;
@@ -588,14 +582,10 @@
   .user-section {
     flex-direction: column;
     gap: 1.2vw;
+    margin-right:5vw;
+    margin-top:0.5vh;
   }
-  
-  .tab-navigation {
-    flex-direction: column;
-  }
-  
   .tab-button {
-    width: 100%;
     justify-content: center;
   }
   

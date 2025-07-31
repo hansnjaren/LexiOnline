@@ -52,7 +52,6 @@
   font-size: 2.5vh;
   font-weight: 700;
   color: #ffffff;
-  text-shadow: 0 0 0.5vh rgba(255, 255, 255, 0.5);
   transform: scale(1);
   opacity: 1;
   transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -78,7 +77,6 @@
 /* 더 멀리 있는 슬라이드들 */
 .combination-swiper .swiper-slide:not(.swiper-slide-active):not(.swiper-slide-prev):not(.swiper-slide-next) .combination-item {
   font-size: 1vh;
-  color: rgba(255, 255, 255, 0.3);
   transform: scale(0.6);
   opacity: 0.4;
   transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
