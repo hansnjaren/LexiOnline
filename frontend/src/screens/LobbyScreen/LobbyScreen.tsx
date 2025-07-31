@@ -157,8 +157,8 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
   const handleLogin = () => {
     const state = Math.random().toString(36).substring(2);
     const nonce = Math.random().toString(36).substring(2);
-    localStorage.setItem('oauth_state', state);
-    localStorage.setItem('oauth_nonce', nonce);
+    sessionStorage.setItem('oauth_state', state);
+    sessionStorage.setItem('oauth_nonce', nonce);
 
     const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID!;
     const redirectUri = process.env.REACT_APP_GOOGLE_REDIRECT_URI!;
