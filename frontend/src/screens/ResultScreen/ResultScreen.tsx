@@ -41,6 +41,62 @@ const getTwosCount = (hand: number[], maxNumber: number): number => {
 };
 // #endregion
 
+// #region AnimatedNumber Component
+const AnimatedNumber: React.FC<{
+  value: number;
+  isAnimating: boolean;
+  direction: 'up' | 'down';
+}> = ({ value, isAnimating, direction }) => {
+  const [displayValue, setDisplayValue] = React.useState(value);
+  const [isRunning, setIsRunning] = React.useState(false);
+
+  React.useEffect(() => {
+    if (isAnimating && !isRunning) {
+      setIsRunning(true);
+      const startValue = displayValue;
+      const endValue = value;
+      const startTime = Date.now();
+      const duration = 1500; // 화살표 애니메이션과 동일한 지속시간
+      
+      // 중간 값들을 생성 (빠르게 휘리릭 지나가는 효과)
+      const intermediateValues: number[] = [];
+      const steps = 25; // 더 부드러운 애니메이션을 위해 단계 증가
+      for (let i = 0; i <= steps; i++) {
+        const progress = i / steps;
+        const easeProgress = 1 - Math.pow(1 - progress, 2); // easeOutQuad
+        const intermediateValue = Math.round(startValue + (endValue - startValue) * easeProgress);
+        intermediateValues.push(intermediateValue);
+      }
+      
+      const stepDuration = duration / steps;
+      
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const step = Math.floor(elapsed / stepDuration);
+        
+        if (step < intermediateValues.length) {
+          setDisplayValue(intermediateValues[step]);
+          requestAnimationFrame(animate);
+        } else {
+          setDisplayValue(endValue);
+          setIsRunning(false);
+        }
+      };
+      
+      requestAnimationFrame(animate);
+    } else if (!isAnimating) {
+      setDisplayValue(value);
+    }
+  }, [value, isAnimating, isRunning, displayValue]);
+
+  return (
+    <div className="animated-number">
+      {displayValue}
+    </div>
+  );
+};
+// #endregion
+
 // #region AnimatedArrow Component
 const AnimatedArrow: React.FC<{
   from: { x: number; y: number } | null;
@@ -141,6 +197,9 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
   const [transfers, setTransfers] = useState<Array<{ giverId: string; receiverId: string; amount: number }>>([]);
   const [isReadyForAnimation, setIsReadyForAnimation] = useState(false);
   const [actualPlayerCount] = useState(() => (comprehensiveResult?.scores || []).length || playerCount);
+  
+  // 애니메이션 상태 관리
+  const [scoreAnimations, setScoreAnimations] = useState<{ [playerId: string]: { isAnimating: boolean; direction: 'up' | 'down' } }>({});
 
   const playerRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const layoutRef = useRef<HTMLDivElement | null>(null);
@@ -322,6 +381,13 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
       if (giver && receiver) {
         setTransferMessage(`<span class="guide-tag">${giver.nickname}</span> 님이 <span class="guide-tag">${receiver.nickname}</span> 님에게 코인 전달`);
         
+        // 애니메이션 상태 설정
+        setScoreAnimations(prev => ({
+          ...prev,
+          [giver.playerId]: { isAnimating: true, direction: 'down' },
+          [receiver.playerId]: { isAnimating: true, direction: 'up' }
+        }));
+        
         setDisplayScores(currentScores => {
           const newScores = { ...currentScores };
           newScores[giver.playerId] -= transfer.amount;
@@ -329,6 +395,15 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
           return newScores;
         });
         setShowArrow(true);
+        
+        // 애니메이션 완료 후 상태 초기화 (화살표 애니메이션과 동일한 타이밍)
+        setTimeout(() => {
+          setScoreAnimations(prev => ({
+            ...prev,
+            [giver.playerId]: { isAnimating: false, direction: 'down' },
+            [receiver.playerId]: { isAnimating: false, direction: 'up' }
+          }));
+        }, 1500);
       } else {
         setShowArrow(false);
       }
@@ -403,7 +478,11 @@ const ResultScreen: React.FC<ResultScreenProps> = ({ onScreenChange, playerCount
                   <div className="tiles-info">
                     <span className="remaining-count">{playerComponents[player.playerId] ?? 0}개</span>
                     <div className={`tile-count ${rankColor}`}>
-                      {displayScores[player.playerId] ?? 0}
+                      <AnimatedNumber 
+                        value={displayScores[player.playerId] ?? 0}
+                        isAnimating={scoreAnimations[player.playerId]?.isAnimating || false}
+                        direction={scoreAnimations[player.playerId]?.direction || 'up'}
+                      />
                     </div>
                   </div>
                 </div>
