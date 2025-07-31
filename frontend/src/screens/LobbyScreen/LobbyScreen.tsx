@@ -15,7 +15,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
   const navigate = useNavigate();
   const [nickname, setNickname] = useState('');
   const [roomCode, setRoomCode] = useState('');
-  const [token, setToken] = useState<string | null>(() => sessionStorage.getItem('access_token'));
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('access_token'));
   const [user, setUser] = useState<User | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,13 +31,22 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
   });
 
   useEffect(() => {
+    // Check for saved room info and redirect to waiting screen if it exists
+    const savedRoomInfo = localStorage.getItem('room_info');
+    if (savedRoomInfo) {
+      console.log('Saved room info found, redirecting to waiting room.');
+      navigate('/waiting');
+    }
+  }, [navigate]);
+
+  useEffect(() => {
     if (!token) {
       setUser(null);
       setIsLoading(false);
       return;
     }
 
-    fetch('/api/userinfo', {
+    fetch('https://api.lexionline.minsung.kr/api/userinfo', {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(async res => {
@@ -53,7 +62,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
         setUser(data.user);
         if (data.user.nickname) {
           setNickname(data.user.nickname);
-          sessionStorage.setItem('current_nickname', data.user.nickname);
+          localStorage.setItem('current_nickname', data.user.nickname);
         }
         setIsLoading(false);
       })
@@ -61,8 +70,9 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
         console.error(err);
         setUser(null);
         setToken(null);
-        sessionStorage.removeItem('access_token');
+        localStorage.removeItem('access_token');
         setIsLoading(false);
+        navigate('/');
       });
   }, [token]);
 
@@ -86,12 +96,12 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
 
     setIsConnecting(true);
     try {
-      const authToken = sessionStorage.getItem('access_token');
+      const authToken = localStorage.getItem('access_token');
       const room = await ColyseusService.createRoom({ authToken });
       console.log('방 생성 성공:', room.sessionId);
       
       // 닉네임 설정 및 중복 체크
-      room.onMessage('nicknameRejected', (message) => {
+      room.onMessage('nicknameRejected', (message: any) => {
         console.error('닉네임 설정 거부:', message.reason);
         showToast(`닉네임 설정 실패: ${message.reason}`, 'error');
         setIsConnecting(false);
@@ -119,12 +129,12 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
 
     setIsConnecting(true);
     try {
-      const authToken = sessionStorage.getItem('access_token');
+      const authToken = localStorage.getItem('access_token');
       const room = await ColyseusService.joinRoom(roomCode, { authToken });
       console.log('방 참가 성공:', room.sessionId);
       
       // 닉네임 설정 및 중복 체크
-      room.onMessage('nicknameRejected', (message) => {
+      room.onMessage('nicknameRejected', (message: any) => {
         console.error('닉네임 설정 거부:', message.reason);
         showToast(`닉네임 설정 실패: 해당 방에 이미 존재하는 닉네임입니다.`, 'error');
         setIsConnecting(false);
@@ -165,7 +175,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({ onScreenChange }) => {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('access_token');
+    localStorage.removeItem('access_token');
     setToken(null);
     setUser(null);
     setNickname('');

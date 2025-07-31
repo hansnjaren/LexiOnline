@@ -1,74 +1,149 @@
 import { Client, Room } from "colyseus.js";
+import { GameState, Player, Card, BoardCard } from "../components/GameScreen/types";
+import { getCardColorFromNumber, getCardValueFromNumber } from "../components/GameScreen/cardUtils";
+
+type ScreenType = 'lobby' | 'waiting' | 'game' | 'result' | 'finalResult';
+type GameStateSubscriber = (state: GameStateContainer) => void;
+type ScreenChangeSubscriber = (screen: ScreenType, data?: any) => void;
+
+export interface GameStateContainer {
+  players: Player[];
+  mySessionId: string;
+  myHand: Card[];
+  sortedHand: Card[];
+  visibleHand: Card[];
+  gameState: GameState;
+  gameMode: 'easyMode' | 'normal';
+  boardCards: BoardCard[];
+  waitingForNextRound: boolean;
+  readyPlayers: Set<string>;
+  showCardDealAnimation: boolean;
+  dealtCards: Set<number>;
+  isGameStarted: boolean;
+  showBoardMask: boolean;
+  isSubmitting: boolean;
+}
+
+// UUID 생성 함수
+function generateUuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
 class ColyseusService {
   private client: Client;
   private room: Room | null = null;
-  private isConnected: boolean = false;
+  public state: GameStateContainer;
+  private subscribers: Set<GameStateSubscriber> = new Set();
+  private screenChangeSubscribers: Set<ScreenChangeSubscriber> = new Set();
+  private guestId: string;
   private roomInfo: { roomId: string; sessionId: string; nickname: string } | null = null;
 
   constructor() {
-    this.client = new Client("ws://localhost:2567");
+    const colyseusUrl = process.env.REACT_APP_COLYSEUS_URL || "ws://localhost:2567";
+    this.client = new Client(colyseusUrl);
+    this.state = this.getInitialState();
+    this.guestId = this.getOrCreateGuestId();
   }
 
-  async connectToRoom(roomName?: string): Promise<Room> {
+  private getOrCreateGuestId(): string {
+    let guestId = localStorage.getItem("guestId");
+    if (!guestId) {
+      guestId = generateUuid();
+      localStorage.setItem("guestId", guestId);
+    }
+    return guestId;
+  }
+
+  private getInitialState(): GameStateContainer {
+    return {
+      players: [],
+      mySessionId: '',
+      myHand: [],
+      sortedHand: [],
+      visibleHand: [],
+      gameState: {
+        lastType: 0,
+        lastMadeType: 0,
+        lastHighestValue: -1,
+        currentTurnId: 0,
+        maxNumber: 13,
+        round: 1,
+        totalRounds: 5
+      },
+      gameMode: 'easyMode',
+      boardCards: [],
+      waitingForNextRound: false,
+      readyPlayers: new Set(),
+      showCardDealAnimation: false,
+      dealtCards: new Set(),
+      isGameStarted: false,
+      showBoardMask: false,
+      isSubmitting: false,
+    };
+  }
+
+  // --- Pub/Sub Methods ---
+  subscribe(callback: GameStateSubscriber) {
+    this.subscribers.add(callback);
+    return () => { this.unsubscribe(callback); };
+  }
+
+  unsubscribe(callback: GameStateSubscriber) {
+    this.subscribers.delete(callback);
+  }
+
+  subscribeScreenChange(callback: ScreenChangeSubscriber) {
+    this.screenChangeSubscribers.add(callback);
+    return () => { this.screenChangeSubscribers.delete(callback); };
+  }
+
+  private notifyScreenChange(screen: ScreenType, data?: any) {
+    this.screenChangeSubscribers.forEach(callback => callback(screen, data));
+  }
+
+  private notify() {
+    this.subscribers.forEach(callback => callback(this.state));
+  }
+
+  private setState(newState: Partial<GameStateContainer>) {
+    this.state = { ...this.state, ...newState };
+    this.notify();
+  }
+
+  // --- Connection Methods ---
+  private async setupRoom(room: Room) {
+    this.room = room;
+    this.setState({ mySessionId: room.sessionId });
+    this.initializeListeners();
+    this.saveRoomInfo();
+
+    room.onLeave(() => {
+      this.room = null;
+      this.state = this.getInitialState();
+      this.clearRoomInfo();
+      this.notify();
+    });
+  }
+
+  async joinOrCreate(options: any = {}): Promise<Room> {
     try {
-      if (roomName) {
-        // 기존 방에 참가
-        this.room = await this.client.join("my_room", { roomName });
-      } else {
-        // 새 방 생성 또는 참가
-        this.room = await this.client.joinOrCreate("my_room");
-      }
-
-      this.isConnected = true;
-      
-      // 방 정보 저장
-      this.saveRoomInfo();
-      
-      // 연결 상태 이벤트 리스너
-      this.room.onLeave((code) => {
-        console.log("방에서 나갔습니다:", code);
-        this.isConnected = false;
-        this.room = null;
-        this.clearRoomInfo();
-      });
-
-      this.room.onError((code, message) => {
-        console.error("방 연결 오류:", code, message);
-        this.isConnected = false;
-        this.clearRoomInfo();
-      });
-
-      return this.room;
+      const room = await this.client.joinOrCreate("my_room", { ...options, guestId: this.guestId });
+      await this.setupRoom(room);
+      return room;
     } catch (error) {
-      console.error("방 연결 실패:", error);
+      console.error("방 생성 또는 참가 실패:", error);
       throw error;
     }
   }
 
   async createRoom(options: any = {}): Promise<Room> {
     try {
-      this.room = await this.client.create("my_room", options);
-      this.isConnected = true;
-      
-      // 방 정보 저장
-      this.saveRoomInfo();
-      
-      // 연결 상태 이벤트 리스너
-      this.room.onLeave((code) => {
-        console.log("방에서 나갔습니다:", code);
-        this.isConnected = false;
-        this.room = null;
-        this.clearRoomInfo();
-      });
-
-      this.room.onError((code, message) => {
-        console.error("방 연결 오류:", code, message);
-        this.isConnected = false;
-        this.clearRoomInfo();
-      });
-
-      return this.room;
+      const room = await this.client.create("my_room", { ...options, guestId: this.guestId });
+      await this.setupRoom(room);
+      return room;
     } catch (error) {
       console.error("방 생성 실패:", error);
       throw error;
@@ -77,39 +152,12 @@ class ColyseusService {
 
   async joinRoom(roomId: string, options: any = {}): Promise<Room> {
     try {
-      // roomId가 실제 방 ID인지 확인하고 참가
-      this.room = await this.client.joinById(roomId, options);
-      this.isConnected = true;
-      
-      // 방 정보 저장
-      this.saveRoomInfo();
-      
-      // 연결 상태 이벤트 리스너
-      this.room.onLeave((code) => {
-        console.log("방에서 나갔습니다:", code);
-        this.isConnected = false;
-        this.room = null;
-        this.clearRoomInfo();
-      });
-
-      this.room.onError((code, message) => {
-        console.error("방 연결 오류:", code, message);
-        this.isConnected = false;
-        this.clearRoomInfo();
-      });
-
-      return this.room;
+      const room = await this.client.joinById(roomId, { ...options, guestId: this.guestId });
+      await this.setupRoom(room);
+      return room;
     } catch (error) {
       console.error("방 참가 실패:", error);
       throw error;
-    }
-  }
-
-  sendMessage(type: string, data: any) {
-    if (this.room && this.isConnected) {
-      this.room.send(type, data);
-    } else {
-      console.warn("방에 연결되지 않았습니다.");
     }
   }
 
@@ -117,105 +165,226 @@ class ColyseusService {
     return this.room;
   }
 
-  isRoomConnected(): boolean {
-    return this.isConnected && this.room !== null;
-  }
-
   disconnect() {
     if (this.room) {
       this.room.leave();
-      this.room = null;
-      this.isConnected = false;
     }
-    this.clearRoomInfo();
   }
 
-  // 방 정보 저장
+  public cardDealAnimationComplete() {
+    this.setState({ showCardDealAnimation: false });
+  }
+
+  public submitCards(cardNumbers: number[]) {
+    if (this.room) {
+      this.setState({ isSubmitting: true });
+      this.room.send('submit', { submitCards: cardNumbers });
+    }
+  }
+  
+  // --- Room Info ---
   private saveRoomInfo() {
     if (this.room) {
       this.roomInfo = {
         roomId: this.room.roomId,
         sessionId: this.room.sessionId,
-        nickname: sessionStorage.getItem('current_nickname') || ''
+        nickname: localStorage.getItem('current_nickname') || ''
       };
-      sessionStorage.setItem('room_info', JSON.stringify(this.roomInfo));
-      console.log('방 정보 저장됨:', this.roomInfo);
+      localStorage.setItem('room_info', JSON.stringify(this.roomInfo));
     }
   }
 
-  // 방 정보 삭제
   private clearRoomInfo() {
     this.roomInfo = null;
-    sessionStorage.removeItem('room_info');
+    localStorage.removeItem('room_info');
   }
 
-  // 저장된 방 정보 가져오기
   getSavedRoomInfo() {
     if (!this.roomInfo) {
-      const saved = sessionStorage.getItem('room_info');
+      const saved = localStorage.getItem('room_info');
       if (saved) {
         this.roomInfo = JSON.parse(saved);
-        console.log('저장된 방 정보 로드됨:', this.roomInfo);
       }
     }
     return this.roomInfo;
   }
 
-  // 저장된 방에 재연결 시도
   async reconnectToSavedRoom(): Promise<Room | null> {
     const savedInfo = this.getSavedRoomInfo();
-    if (!savedInfo) {
+    if (!savedInfo || !savedInfo.roomId) {
+      this.clearRoomInfo();
       return null;
     }
 
     try {
-      console.log('저장된 방에 재연결 시도:', savedInfo.roomId);
-      this.room = await this.client.joinById(savedInfo.roomId);
-      this.isConnected = true;
-      
-      // 재연결 시 기존 닉네임 확인
-      console.log('재연결 완료. 기존 닉네임 확인 중:', savedInfo.nickname);
-      
-      // 서버에 기존 닉네임 확인 요청
-      this.room.send('checkNickname');
-      
-      // 닉네임 확인 응답 처리
-      this.room.onMessage('nicknameConfirmed', (message) => {
-        console.log('기존 닉네임 확인됨:', message.nickname);
-        // 기존 닉네임이 있으면 저장된 정보 업데이트
-        if (message.nickname && message.nickname !== '익명') {
-          this.roomInfo = { ...this.roomInfo!, nickname: message.nickname };
-          sessionStorage.setItem('room_info', JSON.stringify(this.roomInfo));
-        }
+      const authToken = localStorage.getItem('access_token');
+      console.log(`저장된 방에 재연결 시도: roomId=${savedInfo.roomId}`);
+      const room = await this.client.joinById(savedInfo.roomId, { 
+        guestId: this.guestId,
+        authToken: authToken 
       });
-      
-      // 연결 상태 이벤트 리스너 재설정
-      this.room.onLeave((code) => {
-        console.log("방에서 나갔습니다:", code);
-        this.isConnected = false;
-        this.room = null;
-        this.clearRoomInfo();
-      });
-
-      this.room.onError((code, message) => {
-        console.error("방 연결 오류:", code, message);
-        this.isConnected = false;
-        this.clearRoomInfo();
-      });
-
-      console.log('저장된 방 재연결 성공');
-      return this.room;
+      await this.setupRoom(room);
+      return room;
     } catch (error) {
       console.error("저장된 방 재연결 실패:", error);
-      
-      // 방이 존재하지 않는 경우 (정상적인 상황)
-      if (error instanceof Error && error.message && error.message.includes('not found')) {
-        console.log('방이 이미 닫혔거나 존재하지 않습니다. 저장된 정보를 삭제합니다.');
-      }
-      
       this.clearRoomInfo();
       return null;
     }
+  }
+
+  // --- Listener Initialization ---
+  private initializeListeners() {
+    if (!this.room) return;
+
+    const room = this.room;
+
+    const applySavedSortOrder = (handCards: Card[]): Card[] => {
+        const sortOrderKey = `sortOrder-${room.roomId}-${this.state.mySessionId}`;
+        const savedOrderJSON = localStorage.getItem(sortOrderKey);
+        if (savedOrderJSON) {
+            try {
+                const savedOrder: number[] = JSON.parse(savedOrderJSON);
+                const handCardMap = new Map(handCards.map(card => [card.originalNumber, card]));
+                const sorted = savedOrder.map(num => handCardMap.get(num)).filter((c): c is Card => !!c);
+                const remaining = handCards.filter(c => !savedOrder.includes(c.originalNumber));
+                return [...sorted, ...remaining];
+            } catch (e) {
+                localStorage.removeItem(sortOrderKey);
+            }
+        }
+        return handCards;
+    };
+
+    const setAndSortHand = (handCards: Card[]) => {
+        const sorted = applySavedSortOrder(handCards);
+        this.setState({ myHand: sorted, sortedHand: sorted, visibleHand: sorted });
+    };
+    
+    const syncPlayerRemainingCards = () => {
+        if (!this.room || !this.room.state) return;
+        const updatedPlayers = this.state.players.map(player => {
+            const backendPlayer = this.room!.state.players.get(player.sessionId);
+            return { ...player, remainingTiles: backendPlayer?.hand?.length ?? 0 };
+        });
+        this.setState({ players: updatedPlayers });
+    };
+
+    room.onStateChange((state) => {
+        const myPlayer = state.players.get(room.sessionId);
+        const newPlayers: Player[] = [];
+        if (state.players && state.playerOrder) {
+            const currentPlayerSessionId = state.playerOrder[state.nowPlayerIndex];
+            state.playerOrder.forEach((sessionId: string, index: number) => {
+                const player = state.players.get(sessionId);
+                if (player) {
+                    newPlayers.push({
+                        id: index.toString(),
+                        nickname: player.nickname || '익명',
+                        score: player.score || 0,
+                        remainingTiles: player.hand ? player.hand.length : 0,
+                        isCurrentPlayer: sessionId === currentPlayerSessionId,
+                        sessionId: sessionId,
+                        hasPassed: player.hasPassed || false
+                    });
+                }
+            });
+        }
+
+        const newGameState = {
+            lastType: state.lastType,
+            lastMadeType: state.lastMadeType,
+            lastHighestValue: state.lastHighestValue,
+            currentTurnId: state.currentTurnId,
+            maxNumber: state.maxNumber,
+            round: state.round,
+            totalRounds: state.totalRounds
+        };
+
+        this.setState({
+            players: newPlayers,
+            gameState: newGameState,
+            gameMode: myPlayer?.easyMode ? 'easyMode' : 'normal'
+        });
+
+        const handCards = myPlayer?.hand.map((cardNum: number, i: number) => ({
+            id: i,
+            value: getCardValueFromNumber(cardNum, state.maxNumber),
+            color: getCardColorFromNumber(cardNum, state.maxNumber),
+            originalNumber: cardNum
+        })) || [];
+        setAndSortHand(handCards);
+    });
+
+    room.onMessage('roundStart', (message) => {
+        if (message.hand) {
+            const handCards = message.hand.map((cardNum: number, i: number) => ({
+                id: i,
+                value: getCardValueFromNumber(cardNum, message.maxNumber),
+                color: getCardColorFromNumber(cardNum, message.maxNumber),
+                originalNumber: cardNum
+            }));
+            setAndSortHand(handCards);
+            this.setState({ showCardDealAnimation: true, dealtCards: new Set(), visibleHand: [] });
+        }
+    });
+    
+    room.onMessage('allPlayersReadyForNextRound', () => {
+        this.setState({ waitingForNextRound: false, readyPlayers: new Set() });
+    });
+
+    room.onMessage('waitingForNextRound', () => {
+        this.setState({ waitingForNextRound: true, readyPlayers: new Set() });
+        this.room?.send('requestReadyStatus');
+    });
+
+    room.onMessage('readyForNextRound', (message) => {
+        const newReadyPlayers = new Set(this.state.readyPlayers);
+        newReadyPlayers.add(message.playerId);
+        this.setState({ readyPlayers: newReadyPlayers });
+    });
+
+    room.onMessage('readyStatusResponse', (message) => {
+        this.setState({ readyPlayers: new Set(message.readyPlayers as string[]) });
+    });
+
+    room.onMessage('submitted', (message) => {
+        const submittedMaxNumber = room?.state?.maxNumber ?? 13;
+        if (message.position) {
+            const submittedCards: BoardCard[] = message.cards.map((cardNumber: number, index: number) => ({
+                id: Date.now() + index + Math.random(),
+                value: getCardValueFromNumber(cardNumber, submittedMaxNumber),
+                color: getCardColorFromNumber(cardNumber, submittedMaxNumber),
+                originalNumber: cardNumber,
+                playerId: message.playerId,
+                row: message.position.row,
+                col: message.position.col + index,
+                isNew: true,
+                turnId: message.turnId,
+                submitTime: Date.now()
+            }));
+            this.setState({ boardCards: [...this.state.boardCards, ...submittedCards] });
+        }
+        syncPlayerRemainingCards();
+        this.setState({ isSubmitting: false });
+    });
+
+    room.onMessage('submitRejected', (message) => {
+      alert('카드 제출이 거부되었습니다: ' + message.reason);
+      this.setState({ isSubmitting: false });
+    });
+
+    room.onMessage('roundEnded', (message) => {
+        this.setState({ boardCards: [] });
+        this.notifyScreenChange('result', message);
+    });
+
+    room.onMessage('gameEnded', (message) => {
+        this.notifyScreenChange('finalResult', message.finalScores);
+    });
+
+    room.onMessage('finalResult', (message) => {
+        this.notifyScreenChange('finalResult', message.finalScores);
+    });
   }
 }
 

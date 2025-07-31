@@ -41,7 +41,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
 
     if (!window.location.hash) {
       console.log('[OAuthCallback] URL 해시가 없음, 인증 실패');
-      navigate('/login');
+      navigate('/');
       return;
     }
 
@@ -63,7 +63,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
       window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
       console.log('[OAuthCallback] URL 해시 제거 완료');
 
-      navigate('/login');
+      navigate('/');
       return;
     }
 
@@ -74,7 +74,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
     console.log('[OAuthCallback] id_token:', idToken);
 
     if (idToken) {
-      fetch('/api/auth/google', {
+      fetch('https://api.lexionline.minsung.kr/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: idToken }),
@@ -88,7 +88,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
         })
         .then((data) => {
           // 로그인 성공 처리
-          sessionStorage.setItem('access_token', data.token);
+          localStorage.setItem('access_token', data.token);
           // 해시 제거는 로그인 성공 후 여기서 단 한 번만
           window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
           console.log('[OAuthCallback] URL 해시 제거 완료');
@@ -100,7 +100,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
           // 해시 제거는 오류 시에도 단 한 번만
           window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
           console.log('[OAuthCallback] URL 해시 제거 완료');
-          navigate('/login');
+          navigate('/');
         });
     } else {
       console.error('[OAuthCallback] id_token이 없음');
@@ -108,7 +108,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
       // 해시 제거도 단 한 번만
       window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
       console.log('[OAuthCallback] URL 해시 제거 완료');
-      navigate('/login');
+      navigate('/');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

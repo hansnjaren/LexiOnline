@@ -1,6 +1,6 @@
-// src/gameLogic/cardEvaluator.ts
-import { ArraySchema } from "@colyseus/schema";
+import { GameState } from './types';
 
+// Constants
 export const MADE_NONE = 0;
 export const MADE_STRAIGHT = 1;
 export const MADE_FLUSH = 2;
@@ -8,30 +8,34 @@ export const MADE_FULLHOUSE = 3;
 export const MADE_FOURCARDS = 4;
 export const MADE_STRAIGHTFLUSH = 5;
 
+export const colorMapping = {
+  'gold': 'sun',
+  'silver': 'moon',
+  'bronze': 'star',
+  'black': 'cloud'
+};
+
 export interface MadeEvalResult {
   type: number;
   value: number;
   valid: boolean;
+  madeType?: number;
 }
 
-export function parseCard(card: number, maxNumber: number) {
+// Helper functions
+export const parseCard = (card: number, maxNumber: number) => {
   const type = Math.floor(card / maxNumber);
   const number = (card + maxNumber - 2) % maxNumber;
-  console.log(`[DEBUG] 카드 파싱: card=${card}, maxNumber=${maxNumber}, type=${type}, number=${number}`);
   return { type, number };
-}
+};
 
-export function getValue(number: number, type: number, maxNumber: number): number {
+export const getValue = (number: number, type: number, maxNumber: number): number => {
   return number * maxNumber + type;
-}
+};
 
-export function isStraightWithException(numbers: number[], maxNumber: number): boolean {
-  console.log(`[DEBUG] 스트레이트 검사 시작: numbers=[${numbers.join(', ')}], maxNumber=${maxNumber}`);
-
+export const isStraightWithException = (numbers: number[], maxNumber: number): boolean => {
   const remappedNumbers = numbers.map(n => (n + 2) % maxNumber).sort((a, b) => a - b);
-  console.log(`[DEBUG] 재매핑된 숫자: [${remappedNumbers.join(', ')}]`);
 
-  // Check for normal consecutive straight
   let isConsecutive = true;
   for (let i = 0; i < remappedNumbers.length - 1; i++) {
     if (remappedNumbers[i+1] - remappedNumbers[i] !== 1) {
@@ -39,26 +43,16 @@ export function isStraightWithException(numbers: number[], maxNumber: number): b
       break;
     }
   }
-  if (isConsecutive) {
-    console.log(`[DEBUG] 일반 연속 스트레이트 확인됨.`);
-    return true;
-  }
+  if (isConsecutive) return true;
 
-  // Check for mountain straight (10-J-Q-K-A)
-  // Remapped numbers are [9, 10, 11, 12, 0], sorted to [0, 9, 10, 11, 12]
-  const mountainStraight = [0, maxNumber - 4, maxNumber - 3, maxNumber - 2, maxNumber - 1];
+  const mountainStraight = [0, maxNumber - 4, maxNumber - 3, maxNumber - 2, maxNumber - 1].sort((a,b) => a-b);
   const isMountain = remappedNumbers.length === mountainStraight.length && remappedNumbers.every((val, index) => val === mountainStraight[index]);
-  if (isMountain) {
-    console.log(`[DEBUG] 마운틴 스트레이트 (10-J-Q-K-A) 확인됨.`);
-    return true;
-  }
+  if (isMountain) return true;
 
-  console.log(`[DEBUG] 스트레이트 아님.`);
   return false;
 }
 
-// 1~3장 simple combo
-export function evaluateSimpleCombo(cards: number[], maxNumber: number): MadeEvalResult {
+export const evaluateSimpleCombo = (cards: number[], maxNumber: number): MadeEvalResult => {
   const len = cards.length;
   if (![1, 2, 3].includes(len)) return { type: MADE_NONE, value: 0, valid: false };
 
@@ -74,8 +68,7 @@ export function evaluateSimpleCombo(cards: number[], maxNumber: number): MadeEva
   return { type: len, value: firstNumber * maxNumber + maxType, valid: true };
 }
 
-// 5장 족보 평가
-export function evaluateMade(cards: number[], maxNumber: number): MadeEvalResult {
+export const evaluateMade = (cards: number[], maxNumber: number): MadeEvalResult => {
   if (cards.length !== 5) return { type: MADE_NONE, value: 0, valid: false };
 
   const parsed = cards.map(card => parseCard(card, maxNumber));
@@ -91,29 +84,24 @@ export function evaluateMade(cards: number[], maxNumber: number): MadeEvalResult
   const isStraight = isStraightWithException(numbers.slice().sort((a, b) => a - b), maxNumber);
 
   let four = false, three = false, two = false;
-  for (const count of numCount.values()) {
+  for (const count of Array.from(numCount.values())) {
     if (count === 4) four = true;
     else if (count === 3) three = true;
     else if (count === 2) two = true;
   }
-  
-  console.log(`[DEBUG] 족보 판별: isFlush=${isFlush}, isStraight=${isStraight}, typeCount.size=${typeCount.size}`);
-  console.log(`[DEBUG] 숫자 분포:`, Array.from(numCount.entries()));
-  console.log(`[DEBUG] 색상 분포:`, Array.from(typeCount.entries()));
-  console.log(`[DEBUG] three=${three}, two=${two}, four=${four}`);
 
   if (isFlush && isStraight) {
     const bestValue = Math.max(...parsed.map(p => getValue(p.number, p.type, maxNumber)));
     return { type: MADE_STRAIGHTFLUSH, value: bestValue, valid: true };
   }
   if (four) {
-    const fourNumber = [...numCount.entries()].find(([, count]) => count === 4)![0];
+    const fourNumber = Array.from(numCount.entries()).find(([, count]) => count === 4)![0];
     const fourCards = parsed.filter(p => p.number === fourNumber);
     const bestType = Math.max(...fourCards.map(c => c.type));
     return { type: MADE_FOURCARDS, value: getValue(fourNumber, bestType, maxNumber), valid: true };
   }
   if (three && two) {
-    const threeNumber = [...numCount.entries()].find(([, count]) => count === 3)![0];
+    const threeNumber = Array.from(numCount.entries()).find(([, count]) => count === 3)![0];
     const threeCards = parsed.filter(p => p.number === threeNumber);
     const bestType = Math.max(...threeCards.map(c => c.type));
     return { type: MADE_FULLHOUSE, value: getValue(threeNumber, bestType, maxNumber), valid: true };
@@ -129,11 +117,38 @@ export function evaluateMade(cards: number[], maxNumber: number): MadeEvalResult
   return { type: MADE_NONE, value: 0, valid: false };
 }
 
-// 제출 카드 손패에서 제거
-export function removeCardsFromHand(playerHand: ArraySchema<number>, submitCards: number[]) {
-  for (const card of submitCards) {
-    const idx = playerHand.indexOf(card);
-    if (idx !== -1) playerHand.splice(idx, 1);
-    else console.warn(`Removing card failed: card ${card} not found in hand`);
-  }
-}
+export const getCardColorFromNumber = (cardNumber: number, maxNumber: number): string => {
+  const safeMaxNumber = maxNumber > 0 ? maxNumber : 13;
+  const colorIndex = Math.floor(cardNumber / safeMaxNumber);
+  const colors = ['black', 'bronze', 'silver', 'gold'];
+  return colors[colorIndex] || 'black';
+};
+
+export const getCardValueFromNumber = (cardNumber: number, maxNumber: number): number => {
+  const safeMaxNumber = maxNumber > 0 ? maxNumber : 13;
+  return (cardNumber % safeMaxNumber) + 1;
+};
+
+export const getLastMadeTypeText = (lastMadeType: number): string => {
+    switch (lastMadeType) {
+      case 0: return '없음';
+      case 1: return '스트레이트';
+      case 2: return '플러시';
+      case 3: return '풀하우스';
+      case 4: return '포카드';
+      case 5: return '스트레이트플러시';
+      default: return '알 수 없음';
+    }
+};
+
+export const getLastTypeText = (lastType: number): string => {
+    switch (lastType) {
+      case 0: return '없음';
+      case 1: return '싱글';
+      case 2: return '원페어';
+      case 3: return '트리플';
+      case 4: return '포카드';
+      case 5: return '메이드';
+      default: return '알 수 없음';
+    }
+};

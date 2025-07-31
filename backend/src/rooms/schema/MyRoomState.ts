@@ -26,6 +26,8 @@ export class MyRoomState extends Schema {
 
   @type("boolean") easyMode = false;
 
+  @type("boolean") blindMode = false;
+
   @type("int8") nowPlayerIndex = 0;
 
   @type("int8") maxNumber = 0;
@@ -37,6 +39,8 @@ export class MyRoomState extends Schema {
   @type([ "int8" ]) boardTurnIds = new ArraySchema<number>(); // 각 카드의 턴 ID
 
   @type("int8") currentTurnId = 0; // 현재 턴 ID (카드 제출할 때마다 증가)
+
+  @type("int8") maskTurnId = -1; // 마스킹 시작 턴 ID
 
   // 보드 크기 관리
   @type("int8") currentBoardRows = 4; // 현재 보드 행 수

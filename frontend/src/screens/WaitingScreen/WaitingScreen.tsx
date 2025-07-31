@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Room } from 'colyseus.js';
 import { useNavigate } from 'react-router-dom';
 import './WaitingScreen.css';
 import '../../components/Toast/Toast.css';
@@ -35,7 +36,6 @@ const CustomDropdown: React.FC<{
 
   const selectedOption = options.find(option => option.value === value);
 
-  // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -83,13 +83,15 @@ const CustomDropdown: React.FC<{
 
 const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCount, setPlayerCount }) => {
   const navigate = useNavigate();
+  const roomRef = useRef<Room | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [roomCode, setRoomCode] = useState('');
+  const [hostId, setHostId] = useState('');
   const [rounds, setRounds] = useState(3);
   const [easyMode, setEasyMode] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const [isHost, setIsHost] = useState(false);
-  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(true);
+  const reconnectAttempted = useRef(false);
   const [toast, setToast] = useState<{
     message: string;
     type: 'success' | 'error' | 'info';
@@ -113,96 +115,77 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
   };
 
   useEffect(() => {
-    // URL을 /waiting으로 설정
-    if (window.location.pathname !== '/waiting') {
-      navigate('/waiting');
-    }
-
-    let room = ColyseusService.getRoom();
-    
-    // 방에 연결되지 않은 경우, 저장된 방 정보로 재연결 시도
-    if (!room) {
-      console.log('방에 연결되지 않음. 저장된 방 정보로 재연결 시도...');
-      setIsReconnecting(true);
-      ColyseusService.reconnectToSavedRoom().then(reconnectedRoom => {
-        setIsReconnecting(false);
-        if (reconnectedRoom) {
-          console.log('저장된 방에 재연결 성공');
-          setupRoomListeners(reconnectedRoom);
-        } else {
-          console.log('저장된 방이 이미 닫혔거나 존재하지 않습니다. 로비로 이동합니다.');
-          // URL을 루트로 변경
-          navigate('/');
-          onScreenChange('lobby');
-        }
-      });
-      return;
-    }
-
-    setupRoomListeners(room);
-  }, [onScreenChange, navigate]);
-
-  const setupRoomListeners = (room: any) => {
-    // 방 코드는 roomId를 사용 (실제 방 참가에 사용 가능한 코드)
-    setRoomCode(room.roomId);
-
-    // 초기 상태 로드
-    const loadInitialState = () => {
-      const state = room.state;
-      console.log('초기 방 상태:', state);
+    const initialize = async () => {
+      let room = ColyseusService.getRoom();
       
-      if (state.players) {
-        const playerList: Player[] = [];
-        const seenIds = new Set<string>();
-        
-        state.players.forEach((player: any, sessionId: string) => {
-          // 중복 체크
-          if (seenIds.has(sessionId)) {
-            console.log('중복 플레이어 ID 발견:', sessionId);
+      if (!room && !reconnectAttempted.current) {
+        reconnectAttempted.current = true;
+        try {
+          const reconnectedRoom = await ColyseusService.reconnectToSavedRoom();
+          if (reconnectedRoom) {
+            room = reconnectedRoom;
+          } else {
+            navigate('/');
+            onScreenChange('lobby');
+            setIsReconnecting(false);
             return;
           }
-          seenIds.add(sessionId);
-          
-          playerList.push({
-            id: sessionId,
-            nickname: player.nickname || '익명',
-            isReady: player.ready || false,
-            easyMode: player.easyMode || false,
-          });
-        });
-        setPlayers(playerList);
-        console.log('플레이어 목록 업데이트:', playerList);
+        } catch (error) {
+          console.error('[WaitingScreen] Reconnection error:', error);
+          navigate('/');
+          onScreenChange('lobby');
+          setIsReconnecting(false);
+          return;
+        }
       }
       
-      // 호스트 확인
-      setIsHost(state.host === room.sessionId);
-      console.log('호스트 여부:', state.host === room.sessionId);
+      if (room) {
+        roomRef.current = room;
+        setupRoomListeners(room);
+      } else if (!reconnectAttempted.current) {
+        navigate('/');
+        onScreenChange('lobby');
+      }
       
-      // 라운드 수 설정
+      setIsReconnecting(false);
+    };
+
+    initialize();
+    
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const setupRoomListeners = (room: any) => {
+    setRoomCode(room.roomId);
+
+    const loadInitialState = () => {
+      const state = room.state;
+      if (state.players) {
+        const playerList: Player[] = [];
+        state.players.forEach((player: any, sessionId: string) => {
+          if (player.connected) {
+            playerList.push({
+              id: sessionId,
+              nickname: player.nickname || '익명',
+              isReady: player.ready || false,
+              easyMode: player.easyMode || false,
+            });
+          }
+        });
+        setPlayers(playerList);
+      }
+      setHostId(state.host);
       if (state.totalRounds !== undefined) {
         setRounds(state.totalRounds);
-        console.log('초기 라운드 수 설정:', state.totalRounds);
       }
     };
 
-    // 초기 상태 로드
     loadInitialState();
 
-    // 방 상태 구독
     room.onStateChange((state: any) => {
-      console.log('방 상태 변경:', state);
       if (state.players) {
         const playerList: Player[] = [];
-        const seenIds = new Set<string>();
-        
         state.players.forEach((player: any, sessionId: string) => {
-          // 중복 체크
-          if (seenIds.has(sessionId)) {
-            console.log('중복 플레이어 ID 발견:', sessionId);
-            return;
-          }
-          seenIds.add(sessionId);
-          
           playerList.push({
             id: sessionId,
             nickname: player.nickname || '익명',
@@ -211,21 +194,11 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
           });
         });
         setPlayers(playerList);
-        console.log('플레이어 목록 업데이트:', playerList);
-        
-        // 호스트 확인
-        setIsHost(state.host === room.sessionId);
-        
-        // 라운드 수 업데이트
+        setHostId(state.host);
         if (state.totalRounds !== undefined) {
           setRounds(state.totalRounds);
-          console.log('라운드 수 업데이트:', state.totalRounds);
         }
-        
-        // 본인이 그룹에 포함되어 있는지 확인
-        const isInGroup = state.players.has(room.sessionId);
-        if (!isInGroup) {
-          console.log('본인이 그룹에서 제외되었습니다. 로비로 이동합니다.');
+        if (!state.players.has(room.sessionId)) {
           ColyseusService.disconnect();
           navigate('/');
           onScreenChange('lobby');
@@ -233,30 +206,23 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
       }
     });
 
-    // 메시지 수신
-    room.onMessage('gameStarted', () => {
-      console.log('게임이 시작되었습니다!');
-      onScreenChange('game');
-    });
-
-    room.onMessage('readyUpdate', (message: any) => {
-      console.log('준비 상태 업데이트:', message);
-      // 준비 상태 업데이트 시 플레이어 목록도 업데이트
-      setPlayers(prevPlayers => {
-        const updatedPlayers = prevPlayers.map(player => 
-          player.id === message.playerId 
-            ? { ...player, isReady: message.ready }
-            : player
-        );
-        console.log(`[DEBUG] readyUpdate: 플레이어 목록 업데이트 - ${message.playerId} 준비 상태: ${message.ready}`);
-        console.log(`[DEBUG] readyUpdate: 업데이트된 플레이어 목록:`, updatedPlayers);
-        return updatedPlayers;
+    room.onMessage('reconnected', (message: any) => {
+      const { roomState } = message;
+      const playerList: Player[] = [];
+      Object.entries(roomState.players).forEach(([sessionId, player]: [string, any]) => {
+        playerList.push({
+          id: sessionId,
+          nickname: player.nickname || '익명',
+          isReady: player.ready || false,
+          easyMode: player.easyMode || false,
+        });
       });
-      
-      // 자신의 준비 상태도 업데이트
-      if (message.playerId === room.sessionId) {
-        console.log(`[DEBUG] readyUpdate: 자신의 준비 상태 업데이트 - ${message.ready}`);
-        setIsReady(message.ready);
+      setPlayers(playerList);
+      setHostId(roomState.host);
+      setRounds(roomState.totalRounds);
+      const currentPlayer = roomState.players[room.sessionId];
+      if (currentPlayer) {
+        setIsReady(currentPlayer.ready);
       }
     });
 
@@ -313,8 +279,9 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
 
     room.onMessage('playerReconnected', (message: any) => {
       console.log('플레이어 재연결:', message);
-      // 재연결된 플레이어는 목록에 추가하지 않음 (이미 존재함)
-      // 하지만 닉네임이 업데이트되었을 수 있으므로 업데이트
+      if (message.isHost) {
+        setHostId(message.playerId);
+      }
       setPlayers(prevPlayers => 
         prevPlayers.map(player => 
           player.id === message.playerId 
@@ -324,47 +291,28 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
       );
     });
 
-    room.onMessage('playerLeft', (message: any) => {
-      console.log('플레이어 퇴장:', message);
-      // playerLeft에서는 플레이어를 제거하지 않음
-      // playersUpdated 메시지에서 전체 플레이어 목록을 동기화함
-      
-      // 호스트 변경 확인
-      if (message.newHost) {
-        setIsHost(message.newHost === room.sessionId);
-      }
-    });
-
     room.onMessage('playersUpdated', (message: any) => {
-      console.log('플레이어 목록 업데이트:', message);
-      console.log(`[DEBUG] playersUpdated: 받은 플레이어 목록:`, message.players);
-      
-      // 전체 플레이어 목록을 서버에서 받은 정보로 업데이트
       const updatedPlayers: Player[] = message.players.map((p: any) => ({
         id: p.playerId,
         nickname: p.nickname,
-        isReady: p.isReady, // 서버에서 받은 준비 상태 그대로 사용
+        isReady: p.isReady,
         easyMode: p.easyMode || false,
       }));
-      
-      console.log(`[DEBUG] playersUpdated: 업데이트된 플레이어 목록:`, updatedPlayers);
       setPlayers(updatedPlayers);
       
-      // 호스트 정보도 업데이트
+      const hostPlayer = message.players.find((p: any) => p.isHost);
+      if (hostPlayer) {
+        setHostId(hostPlayer.playerId);
+      }
+
       const currentPlayer = message.players.find((p: any) => p.playerId === room.sessionId);
       if (currentPlayer) {
-        setIsHost(currentPlayer.isHost);
-        // 자신의 준비 상태도 서버 상태와 동기화
-        console.log(`[DEBUG] playersUpdated: 자신의 준비 상태 동기화 - ${currentPlayer.isReady}`);
         setIsReady(currentPlayer.isReady);
       }
     });
 
-    // 방에서 나갈 때 정리
     return () => {
-      room.onLeave(() => {
-        console.log('대기실에서 나갔습니다.');
-      });
+      room.onLeave(() => console.log('대기실에서 나갔습니다.'));
     };
   };
 
@@ -378,15 +326,14 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
   };
 
   const handleStartGame = () => {
-    const room = ColyseusService.getRoom();
-    if (room && isHost) {
+    const room = roomRef.current;
+    if (room && room.sessionId === hostId) {
       room.send('start', { rounds });
     }
   };
 
   const handleLeaveRoom = () => {
     ColyseusService.disconnect();
-    // URL을 루트로 변경
     navigate('/');
     onScreenChange('lobby');
   };
@@ -397,8 +344,8 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
   };
 
   const allPlayersReady = players.length > 0 && players.every(player => player.isReady);
+  const isHost = roomRef.current?.sessionId === hostId;
 
-  // 재연결 중일 때 로딩 화면 표시
   if (isReconnecting) {
     return (
       <div className="waiting-screen">
@@ -458,7 +405,7 @@ const WaitingScreen: React.FC<WaitingScreenProps> = ({ onScreenChange, playerCou
         <div className="game-settings">
           <h2>게임 설정</h2>
           <div className="settings-row">
-                         <div className="rounds-setting">
+             <div className="rounds-setting">
                <label htmlFor="rounds">라운드 수:</label>
                {isHost ? (
                  <CustomDropdown
