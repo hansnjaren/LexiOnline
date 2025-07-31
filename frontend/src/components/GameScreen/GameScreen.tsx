@@ -1473,6 +1473,36 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
     }
   };
 
+  // 제출할 카드를 정렬하는 함수
+  const sortCardsForSubmission = (cardNumbers: number[]): number[] => {
+    const room = ColyseusService.getRoom();
+    const maxNumber = room?.state?.maxNumber || 13;
+    const isEasyMode = room?.state?.easyMode || false;
+    
+    // 색상 순서 정의
+    const colorOrder = isEasyMode 
+      ? ['black', 'bronze', 'silver', 'gold']  // 초보모드
+      : ['cloud', 'star', 'moon', 'sun'];     // 일반모드
+    
+    return cardNumbers.sort((a, b) => {
+      // 먼저 숫자로 정렬 (오름차순)
+      const aValue = getCardValueFromNumber(a, maxNumber);
+      const bValue = getCardValueFromNumber(b, maxNumber);
+      
+      if (aValue !== bValue) {
+        return aValue - bValue;
+      }
+      
+      // 숫자가 같다면 색상으로 정렬
+      const aColor = getCardColorFromNumber(a, maxNumber);
+      const bColor = getCardColorFromNumber(b, maxNumber);
+      const aColorIndex = colorOrder.indexOf(aColor);
+      const bColorIndex = colorOrder.indexOf(bColor);
+      
+      return aColorIndex - bColorIndex;
+    });
+  };
+
   const handleSubmitCards = () => {
     // 중복 제출 방지
     if (isSubmitting) {
@@ -1535,15 +1565,19 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
         return null;
       }).filter(num => num !== null);
 
+      // 카드를 정렬하여 제출
+      const sortedCardNumbers = sortCardsForSubmission(cardNumbers);
+
       console.log('[DEBUG] 제출하려는 카드들:', {
         selectedCards,
         cardNumbers,
+        sortedCardNumbers,
         myHand: myHand.map(c => ({ id: c.id, value: c.value, color: c.color, originalNumber: c.originalNumber })),
         sortedHand: sortedHand.map(c => ({ id: c.id, value: c.value, color: c.color }))
       });
 
       // 디버깅: 각 카드의 상세 정보 출력
-      cardNumbers.forEach(cardNumber => {
+      sortedCardNumbers.forEach(cardNumber => {
         console.log(debugCardInfo(cardNumber));
       });
 
@@ -1551,7 +1585,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       console.log(debugGameState());
 
       // 제출 가능 여부 확인
-      const validation = canSubmitCards(cardNumbers);
+      const validation = canSubmitCards(sortedCardNumbers);
       console.log(`[DEBUG] 제출 검증: ${validation.reason}`);
       
       if (!validation.canSubmit) {
@@ -1561,8 +1595,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onScreenChange, playerCount }) 
       }
 
       // 백엔드에 submit 메시지 전송
-      console.log(`[DEBUG] submit 메시지 전송: sessionId=${room.sessionId}, submitCards=${cardNumbers.join(', ')}`);
-      room.send('submit', { submitCards: cardNumbers });
+      console.log(`[DEBUG] submit 메시지 전송: sessionId=${room.sessionId}, submitCards=${sortedCardNumbers.join(', ')}`);
+      room.send('submit', { submitCards: sortedCardNumbers });
       
       // 선택 상태 초기화 (백엔드 응답 대기)
       setSelectedCards([]);
