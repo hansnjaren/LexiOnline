@@ -171,70 +171,66 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
   }
 
   async onJoin(client: Client, options: any) {
-    if (this.state.round > 0) {
-      // --- Logged-in User Reconnection ---
-      if (options.authToken) {
+    // --- Reconnection Logic (for both lobby and in-game) ---
+    let existingPlayer: PlayerState | undefined;
+
+    // Try to find an existing disconnected player to reconnect
+    if (options.authToken) {
         try {
-          const decoded = jwt.verify(options.authToken, process.env.JWT_SECRET) as JwtPayload & { userId?: number };
-          if (decoded.userId) {
-            const existingPlayer = Array.from(this.state.players.values()).find(p => p.userId === decoded.userId && !p.connected);
-            if (existingPlayer) {
-              console.log(`[MyRoom] Logged-in user ${existingPlayer.nickname} (ID: ${decoded.userId}) rejoining with new session ${client.sessionId}`);
-              
-              const oldSessionId = existingPlayer.sessionId;
-              this.state.players.delete(oldSessionId);
-              
-              existingPlayer.sessionId = client.sessionId;
-              existingPlayer.connected = true;
-              this.state.players.set(client.sessionId, existingPlayer);
-
-              const orderIndex = this.state.playerOrder.indexOf(oldSessionId);
-              if (orderIndex !== -1) this.state.playerOrder[orderIndex] = client.sessionId;
-              if (this.state.host === oldSessionId) this.state.host = client.sessionId;
-
-              client.send("reconnected", { roomState: this.state, isHost: this.state.host === client.sessionId });
-              this.broadcast("playerReconnected", { 
-                playerId: client.sessionId, 
-                nickname: existingPlayer.nickname,
-                isHost: this.state.host === client.sessionId
-              }, { except: client });
-              return;
+            const decoded = jwt.verify(options.authToken, process.env.JWT_SECRET) as JwtPayload & { userId?: number };
+            if (decoded.userId) {
+                existingPlayer = Array.from(this.state.players.values()).find(p => p.userId === decoded.userId && !p.connected);
             }
-          }
         } catch (err) {
-          console.log("[MyRoom] Auth token invalid during reconnection attempt.");
+            console.log("[MyRoom] Auth token invalid during reconnection attempt.");
         }
-      }
-
-      // --- Guest User Reconnection ---
-      if (options.guestId) {
-        const existingPlayer = Array.from(this.state.players.values()).find(p => p.guestId === options.guestId && !p.connected);
-        if (existingPlayer) {
-          console.log(`[MyRoom] Guest ${existingPlayer.nickname} rejoining with new session ${client.sessionId}`);
-          
-          const oldSessionId = existingPlayer.sessionId;
-          this.state.players.delete(oldSessionId);
-
-          existingPlayer.sessionId = client.sessionId;
-          existingPlayer.connected = true;
-          this.state.players.set(client.sessionId, existingPlayer);
-
-          const orderIndex = this.state.playerOrder.indexOf(oldSessionId);
-          if (orderIndex !== -1) this.state.playerOrder[orderIndex] = client.sessionId;
-          if (this.state.host === oldSessionId) this.state.host = client.sessionId;
-
-          client.send("reconnected", { roomState: this.state, isHost: this.state.host === client.sessionId });
-          this.broadcast("playerReconnected", { 
-            playerId: client.sessionId, 
-            nickname: existingPlayer.nickname,
-            isHost: this.state.host === client.sessionId
-          }, { except: client });
-          return;
-        }
-      }
-      throw new Error("게임이 이미 시작되어 참여할 수 없습니다.");
     }
 
+    if (!existingPlayer && options.guestId) {
+        existingPlayer = Array.from(this.state.players.values()).find(p => p.guestId === options.guestId && !p.connected);
+    }
+
+    if (existingPlayer) {
+        console.log(`[MyRoom] Player ${existingPlayer.nickname} rejoining with new session ${client.sessionId}`);
+        
+        const oldSessionId = existingPlayer.sessionId;
+        this.state.players.delete(oldSessionId);
+        
+        existingPlayer.sessionId = client.sessionId;
+        existingPlayer.connected = true;
+        this.state.players.set(client.sessionId, existingPlayer);
+
+        const orderIndex = this.state.playerOrder.indexOf(oldSessionId);
+        if (orderIndex !== -1) {
+          this.state.playerOrder[orderIndex] = client.sessionId;
+        }
+        
+        if (this.state.host === oldSessionId) {
+            this.state.host = client.sessionId;
+        }
+
+        client.send("reconnected", { roomState: this.state, isHost: this.state.host === client.sessionId });
+        
+        const playersList = Array.from(this.state.players.entries()).map(([id, p]) => ({
+          playerId: id,
+          nickname: p.nickname || '익명',
+          isReady: p.ready,
+          isHost: this.state.host === id,
+          easyMode: p.easyMode
+        }));
+        
+        this.broadcast("playersUpdated", {
+          players: playersList
+        });
+        return;
+    }
+
+    // If game has started and it's not a reconnection, reject.
+    if (this.state.round > 0) {
+        throw new Error("게임이 이미 시작되어 참여할 수 없습니다.");
+    }
+
+    // --- New Player Logic ---
     console.log(`[MyRoom] New player ${client.sessionId} joining.`);
     const player = new PlayerState();
     player.sessionId = client.sessionId;
@@ -246,14 +242,18 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
         const decoded = jwt.verify(options.authToken, process.env.JWT_SECRET) as JwtPayload & { userId?: number };
         const userId = decoded.userId ?? null;
         if (userId) {
-            const existingPlayer = Array.from(this.state.players.values()).find(p => p.userId === userId);
-            if (existingPlayer) {
+            const existingPlayerWithSameUserId = Array.from(this.state.players.values()).find(p => p.userId === userId);
+            if (existingPlayerWithSameUserId) {
                 console.log(`[MyRoom] Existing player ${userId} found. Re-assigning session.`);
-                this.state.players.delete(existingPlayer.sessionId);
-                existingPlayer.sessionId = client.sessionId;
-                existingPlayer.connected = true;
-                this.state.players.set(client.sessionId, existingPlayer);
-                Object.assign(player, existingPlayer);
+                this.state.players.delete(existingPlayerWithSameUserId.sessionId);
+                
+                const orderIndex = this.state.playerOrder.indexOf(existingPlayerWithSameUserId.sessionId);
+                if (orderIndex !== -1) this.state.playerOrder.splice(orderIndex, 1);
+
+                Object.assign(player, existingPlayerWithSameUserId);
+                player.sessionId = client.sessionId;
+                player.connected = true;
+
             } else {
                 player.userId = userId;
                 const user = await prisma.user.findUnique({
@@ -296,27 +296,38 @@ export class MyRoom extends Room<MyRoomState> implements IMyRoom {
     const player = this.state.players.get(client.sessionId);
     if (!player) return;
 
+    console.log(`[MyRoom] Player ${client.sessionId} left. Consented: ${consented}, Round: ${this.state.round}`);
     player.connected = false;
 
-    if (consented || this.state.round === 0) {
-      this.removePlayer(player.sessionId);
+    if (consented) {
+      console.log(`[MyRoom] Player ${player.nickname} left consensually. Removing immediately.`);
+      this.removePlayer(player.sessionId, true);
     } else {
+      console.log(`[MyRoom] Player ${player.nickname} disconnected. Allowing 10 seconds to reconnect.`);
       this.clock.setTimeout(() => {
         if (!player.connected) {
-          this.removePlayer(player.sessionId);
+          console.log(`[MyRoom] Player ${player.nickname} did not reconnect in time. Removing.`);
+          this.removePlayer(player.sessionId, true);
         }
-      }, 20000);
+      }, 10000); // 10 seconds grace time
     }
   }
 
-  removePlayer(sessionId: string) {
+  removePlayer(sessionId: string, changeHost: boolean) {
+    const player = this.state.players.get(sessionId);
+    if (!player) return;
+
     const wasHost = sessionId === this.state.host;
     this.state.players.delete(sessionId);
+    
     const idx = this.state.playerOrder.indexOf(sessionId);
     if (idx !== -1) this.state.playerOrder.splice(idx, 1);
-    if (wasHost) {
-      const next = this.state.players.keys().next().value;
-      this.state.host = next ? next : "";
+    
+    if (wasHost && changeHost && this.state.playerOrder.length > 0) {
+      this.state.host = this.state.playerOrder[0];
+      console.log(`[MyRoom] Host changed to ${this.state.host}`);
+    } else if (this.state.playerOrder.length === 0) {
+      this.state.host = "";
     }
     
     const playersList = Array.from(this.state.players.entries()).map(([id, p]) => ({
