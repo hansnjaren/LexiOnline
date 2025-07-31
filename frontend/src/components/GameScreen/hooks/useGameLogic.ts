@@ -179,15 +179,49 @@ export const useGameLogic = (onScreenChange: (screen: ScreenType, data?: any) =>
   };
 
   const handleSubmitCards = () => {
-    if (isSubmitting || !isMyTurn || selectedCards.length === 0) return;
+    if (isSubmitting || !isMyTurn || selectedCards.length === 0) {
+      if (isSubmitting) console.log('[DEBUG] handleSubmitCards - 이미 제출 중, 중복 호출 방지');
+      if (!isMyTurn) console.log('[DEBUG] handleSubmitCards - 자신의 차례가 아님, 함수 실행 중단');
+      return;
+    }
     
     setIsSubmitting(true);
+
     const room = ColyseusService.getRoom();
     if (room) {
       const cardNumbers = selectedCards.map(cardId => {
-        const card = sortedHand.find(c => c.id === cardId);
-        return card?.originalNumber;
-      }).filter((num): num is number => num !== undefined);
+        const selectedCard = sortedHand.find(c => c.id === cardId);
+        if (!selectedCard) {
+          console.error('선택된 카드를 찾을 수 없습니다:', cardId);
+          return null;
+        }
+        
+        if (selectedCard.originalNumber !== undefined) {
+          return selectedCard.originalNumber;
+        }
+        
+        // Fallback for safety
+        const myPlayer = room.state.players.get(room.sessionId);
+        if (myPlayer && myPlayer.hand) {
+          for (const cardNumber of myPlayer.hand) {
+            const maxNumber = room.state.maxNumber || 13;
+            const color = getCardColorFromNumber(cardNumber, maxNumber);
+            const value = getCardValueFromNumber(cardNumber, maxNumber);
+            if (color === selectedCard.color && value === selectedCard.value) {
+              return cardNumber;
+            }
+          }
+        }
+        
+        console.error('백엔드에서 카드 번호를 찾을 수 없습니다:', selectedCard);
+        return null;
+      }).filter((num): num is number => num !== null);
+
+      if (cardNumbers.length !== selectedCards.length) {
+        alert('제출할 카드 정보를 찾을 수 없습니다. 잠시 후 다시 시도해주세요.');
+        setIsSubmitting(false);
+        return;
+      }
 
       const validation = canSubmitCards(cardNumbers);
       if (!validation.canSubmit) {
@@ -198,8 +232,9 @@ export const useGameLogic = (onScreenChange: (screen: ScreenType, data?: any) =>
       
       room.send('submit', { submitCards: cardNumbers });
       setSelectedCards([]);
+    } else {
+      setIsSubmitting(false);
     }
-    // Note: isSubmitting is reset in the 'submitted' or 'submitRejected' message handler
   };
 
   const handleModeChange = () => {
