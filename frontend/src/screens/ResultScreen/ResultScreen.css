@@ -649,3 +649,10 @@
     opacity: 0.8;
   }
 }
+
+/* 애니메이션 숫자 스타일 */
+.animated-number {
+  font-weight: bold;
+  font-size: 2vh;
+  position: relative;
+}
