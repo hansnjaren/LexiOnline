@@ -4,6 +4,8 @@ import { DEFAULT_RATING_MU, DEFAULT_RATING_SIGMA } from "../../constants/rating"
 
 export class PlayerState extends Schema {
   @type("string") sessionId = "";
+  
+  @type("string") guestId = "";
 
   @type("number") userId: number | null = null;
 
@@ -26,4 +28,6 @@ export class PlayerState extends Schema {
   @type("boolean") hasPassed = false;
 
   @type("boolean") readyForNextRound = false;
+  
+  @type("boolean") connected = true;
 }

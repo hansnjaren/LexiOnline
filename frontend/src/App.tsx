@@ -24,7 +24,7 @@ function AppContent() {
     const path = location.pathname;
     
     // 저장된 방 정보 확인
-    const savedRoomInfo = sessionStorage.getItem('room_info');
+    const savedRoomInfo = localStorage.getItem('room_info');
     
     if (path === '/waiting') {
       setCurrentScreen('waiting');
@@ -43,7 +43,7 @@ function AppContent() {
       // 저장된 방 정보가 없거나 다른 경로인 경우 로비로 이동
       if (savedRoomInfo && path !== '/') {
         console.log('저장된 방 정보가 있지만 다른 경로입니다. 방 정보를 삭제합니다.');
-        sessionStorage.removeItem('room_info');
+        localStorage.removeItem('room_info');
       }
       setCurrentScreen('lobby');
     }
@@ -52,8 +52,8 @@ function AppContent() {
     if (room) {
       room.onMessage('gameReset', (message) => {
         console.log('App.tsx: 게임 상태 초기화 수신:', message);
-        // 세션 스토리지 정리
-        sessionStorage.removeItem('room_info');
+        // 로컬 스토리지 정리
+        localStorage.removeItem('room_info');
         // 로비 화면으로 이동
         handleScreenChange('lobby');
       });

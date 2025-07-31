@@ -82,7 +82,7 @@ export const useGameLogic = (onScreenChange: (screen: ScreenType, data?: any) =>
     const room = ColyseusService.getRoom();
     if (room && mySessionId) {
       const sortOrderKey = `sortOrder-${room.roomId}-${mySessionId}`;
-      sessionStorage.setItem(sortOrderKey, JSON.stringify(order));
+      localStorage.setItem(sortOrderKey, JSON.stringify(order));
     }
   };
 

@@ -24,18 +24,36 @@ export interface GameStateContainer {
   isSubmitting: boolean;
 }
 
+// UUID 생성 함수
+function generateUuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 class ColyseusService {
   private client: Client;
   private room: Room | null = null;
-  
   public state: GameStateContainer;
   private subscribers: Set<GameStateSubscriber> = new Set();
   private screenChangeSubscribers: Set<ScreenChangeSubscriber> = new Set();
+  private guestId: string;
   private roomInfo: { roomId: string; sessionId: string; nickname: string } | null = null;
 
   constructor() {
     this.client = new Client("ws://localhost:2567");
     this.state = this.getInitialState();
+    this.guestId = this.getOrCreateGuestId();
+  }
+
+  private getOrCreateGuestId(): string {
+    let guestId = localStorage.getItem("guestId");
+    if (!guestId) {
+      guestId = generateUuid();
+      localStorage.setItem("guestId", guestId);
+    }
+    return guestId;
   }
 
   private getInitialState(): GameStateContainer {
@@ -111,7 +129,7 @@ class ColyseusService {
 
   async joinOrCreate(options: any = {}): Promise<Room> {
     try {
-      const room = await this.client.joinOrCreate("my_room", options);
+      const room = await this.client.joinOrCreate("my_room", { ...options, guestId: this.guestId });
       await this.setupRoom(room);
       return room;
     } catch (error) {
@@ -122,7 +140,7 @@ class ColyseusService {
 
   async createRoom(options: any = {}): Promise<Room> {
     try {
-      const room = await this.client.create("my_room", options);
+      const room = await this.client.create("my_room", { ...options, guestId: this.guestId });
       await this.setupRoom(room);
       return room;
     } catch (error) {
@@ -133,7 +151,7 @@ class ColyseusService {
 
   async joinRoom(roomId: string, options: any = {}): Promise<Room> {
     try {
-      const room = await this.client.joinById(roomId, options);
+      const room = await this.client.joinById(roomId, { ...options, guestId: this.guestId });
       await this.setupRoom(room);
       return room;
     } catch (error) {
@@ -169,20 +187,20 @@ class ColyseusService {
       this.roomInfo = {
         roomId: this.room.roomId,
         sessionId: this.room.sessionId,
-        nickname: sessionStorage.getItem('current_nickname') || ''
+        nickname: localStorage.getItem('current_nickname') || ''
       };
-      sessionStorage.setItem('room_info', JSON.stringify(this.roomInfo));
+      localStorage.setItem('room_info', JSON.stringify(this.roomInfo));
     }
   }
 
   private clearRoomInfo() {
     this.roomInfo = null;
-    sessionStorage.removeItem('room_info');
+    localStorage.removeItem('room_info');
   }
 
   getSavedRoomInfo() {
     if (!this.roomInfo) {
-      const saved = sessionStorage.getItem('room_info');
+      const saved = localStorage.getItem('room_info');
       if (saved) {
         this.roomInfo = JSON.parse(saved);
       }
@@ -192,14 +210,22 @@ class ColyseusService {
 
   async reconnectToSavedRoom(): Promise<Room | null> {
     const savedInfo = this.getSavedRoomInfo();
-    if (!savedInfo) return null;
+    if (!savedInfo || !savedInfo.roomId) {
+      this.clearRoomInfo();
+      return null;
+    }
 
     try {
-      const room = await this.client.joinById(savedInfo.roomId, { sessionId: savedInfo.sessionId });
+      const authToken = localStorage.getItem('access_token');
+      console.log(`저장된 방에 재연결 시도: roomId=${savedInfo.roomId}`);
+      const room = await this.client.joinById(savedInfo.roomId, { 
+        guestId: this.guestId,
+        authToken: authToken 
+      });
       await this.setupRoom(room);
       return room;
     } catch (error) {
-      console.error("재연결 실패:", error);
+      console.error("저장된 방 재연결 실패:", error);
       this.clearRoomInfo();
       return null;
     }
@@ -213,7 +239,7 @@ class ColyseusService {
 
     const applySavedSortOrder = (handCards: Card[]): Card[] => {
         const sortOrderKey = `sortOrder-${room.roomId}-${this.state.mySessionId}`;
-        const savedOrderJSON = sessionStorage.getItem(sortOrderKey);
+        const savedOrderJSON = localStorage.getItem(sortOrderKey);
         if (savedOrderJSON) {
             try {
                 const savedOrder: number[] = JSON.parse(savedOrderJSON);
@@ -222,7 +248,7 @@ class ColyseusService {
                 const remaining = handCards.filter(c => !savedOrder.includes(c.originalNumber));
                 return [...sorted, ...remaining];
             } catch (e) {
-                sessionStorage.removeItem(sortOrderKey);
+                localStorage.removeItem(sortOrderKey);
             }
         }
         return handCards;
@@ -279,7 +305,6 @@ class ColyseusService {
             gameMode: myPlayer?.easyMode ? 'easyMode' : 'normal'
         });
 
-        // Unconditionally sync hand state from server
         const handCards = myPlayer?.hand.map((cardNum: number, i: number) => ({
             id: i,
             value: getCardValueFromNumber(cardNum, state.maxNumber),
@@ -338,7 +363,6 @@ class ColyseusService {
             }));
             this.setState({ boardCards: [...this.state.boardCards, ...submittedCards] });
         }
-        // Hand updates are handled by onStateChange
         syncPlayerRemainingCards();
         this.setState({ isSubmitting: false });
     });

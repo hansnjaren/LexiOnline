@@ -27,10 +27,10 @@ export default function GoogleOAuthCallback(): JSX.Element {
     console.log('[OAuthCallback] URL 해시 파싱 완료:', window.location.hash);
 
     const returnedState = params.get('state');
-    const savedState = sessionStorage.getItem('oauth_state');
+    const savedState = localStorage.getItem('oauth_state');
 
     console.log('[OAuthCallback] returnedState:', returnedState);
-    console.log('[OAuthCallback] savedState(sessionStorage):', savedState);
+    console.log('[OAuthCallback] savedState(localStorage):', savedState);
 
     if (returnedState !== savedState) {
       console.warn('[OAuthCallback] state 불일치, 잘못된 접근');
@@ -44,7 +44,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
       return;
     }
 
-    sessionStorage.removeItem('oauth_state');
+    localStorage.removeItem('oauth_state');
     console.log('[OAuthCallback] 세션 저장소의 oauth_state 제거');
 
     const idToken = params.get('id_token');
@@ -65,7 +65,7 @@ export default function GoogleOAuthCallback(): JSX.Element {
         })
         .then((data) => {
           // 로그인 성공 처리
-          sessionStorage.setItem('access_token', data.token);
+          localStorage.setItem('access_token', data.token);
           // 해시 제거는 로그인 성공 후 여기서 단 한 번만
           window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
           console.log('[OAuthCallback] URL 해시 제거 완료');
